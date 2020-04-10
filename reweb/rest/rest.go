@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"github.com/hellgate75/rebind/model"
 	"github.com/hellgate75/rebind/net"
-	"github.com/hellgate75/rebind/utils"
 	"net/http"
 )
 
@@ -21,9 +20,10 @@ type RestServer interface {
 	GetService() RestService
 }
 
-type restServer struct{
+type restServer struct {
 	restService RestService
 }
+
 func (r *restServer) Create() http.HandlerFunc {
 	return r.restService.Create
 }
@@ -53,7 +53,6 @@ type RestService interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 }
 
-
 func NewRestService(pipe net.NetPipe) RestService {
 	return &restService{
 		Pipe: pipe,
@@ -65,7 +64,6 @@ type restService struct {
 	Pipe net.NetPipe
 }
 
-
 // Create is HTTP handler of POST model.Request.
 // Use for adding new record to DNS server.
 func (s *restService) Create(w http.ResponseWriter, r *http.Request) {
@@ -76,13 +74,13 @@ func (s *restService) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resource, err := utils.ToResource(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	//resource, err := utils.ToResource(req)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
 
-	s.Dn.Save(utils.NtToString(resource.Header.Name, resource.Header.Type), resource, nil)
+	//s.Dn.Save(utils.NtToString(resource.Header.Name, resource.Header.Type), resource, nil)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -90,7 +88,7 @@ func (s *restService) Create(w http.ResponseWriter, r *http.Request) {
 // Use for reading existed records on DNS server.
 func (s *restService) Read(w http.ResponseWriter, r *http.Request) {
 	//TODO: Consider multiple paths
-	json.NewEncoder(w).Encode(s.Dn.All())
+	//json.NewEncoder(w).Encode(s.Dn.All())
 }
 
 // Update is HTTP handler of PUT model.Request.
@@ -103,24 +101,24 @@ func (s *restService) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oldReq := model.Request{Host: req.Host, Type: req.Type, Data: req.OldData}
-	old, err := utils.ToResource(oldReq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	//oldReq := model.Request{Host: req.Host, Type: req.Type, Data: req.OldData}
+	//old, err := utils.ToResource(oldReq)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
+	//
+	//resource, err := utils.ToResource(req)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
 
-	resource, err := utils.ToResource(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ok := s.Dn.Save(utils.NtToString(resource.Header.Name, resource.Header.Type), resource, &old)
-	if ok {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
+	//ok := s.Dn.Save(utils.NtToString(resource.Header.Name, resource.Header.Type), resource, &old)
+	//if ok {
+	//	w.WriteHeader(http.StatusOK)
+	//	return
+	//}
 
 	http.Error(w, "", http.StatusNotFound)
 }
@@ -136,10 +134,10 @@ func (s *restService) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ok := false
-	h, err := utils.ToResourceHeader(req.Host, req.Type)
-	if err == nil {
-		ok = s.Dn.Remove(utils.NtToString(h.Name, h.Type), nil)
-	}
+	//h, err := utils.ToResourceHeader(req.Host, req.Type)
+	//if err == nil {
+	//	ok = s.Dn.Remove(utils.NtToString(h.Name, h.Type), nil)
+	//}
 
 	if ok {
 		w.WriteHeader(http.StatusOK)

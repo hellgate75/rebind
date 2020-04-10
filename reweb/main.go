@@ -10,23 +10,25 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/net"
-	"github.com/hellgate75/rebind/rest"
+	"github.com/hellgate75/rebind/reweb/rest"
 	"net/http"
 	"os"
 )
 
-var rwDirPath   = flag.String("rwdir","/var/dns","dns storage dir")
-var listenIP    = flag.String("listenip", "8.8.8.8", "http forward ip")
-var listenPort  = flag.Int("listenport", 9000, "http forward port")
-var tlsCert    = flag.String("tsl-cert", "", "tls certificate file path")
-var tlsKey    = flag.String("tsl-key", "", "tls certificate key file path")
+var rwDirPath = flag.String("rwdir", "/var/dns", "dns storage dir")
+var listenIP = flag.String("listenip", "8.8.8.8", "http forward ip")
+var listenPort = flag.Int("listenport", 9000, "http forward port")
+var tlsCert = flag.String("tsl-cert", "", "tls certificate file path")
+var tlsKey = flag.String("tsl-key", "", "tls certificate key file path")
 
-const(
+const (
 	internalListenPort int = 954
-	internalDialPort int = 953
+	internalDialPort   int = 953
 )
+
 //TODO: Give Life to Logger
 var logger log.Logger = log.NewLogger("re-web", log.INFO)
+
 func main() {
 	flag.Parse()
 	if err := os.MkdirAll(*rwDirPath, 0666); err != nil {

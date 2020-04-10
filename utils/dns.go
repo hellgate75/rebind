@@ -12,6 +12,14 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
+var DEFAULT_DOMAIN_NAMES []string = []string{"", "home", "local"}
+
+const DEFAULT_GROUP_NAME = "default"
+
+func IsDefaultGroupDomain(domain string) bool {
+	return StringsListContainItem(domain, DEFAULT_DOMAIN_NAMES, true)
+}
+
 // question to string
 func QToString(q dnsmessage.Question) string {
 	b := make([]byte, q.Name.Length+2)

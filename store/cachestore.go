@@ -5,39 +5,26 @@
 package store
 
 import (
-	"fmt"
-	"net"
-	rErrrors "github.com/hellgate75/rebind/errors"
-	"sync"
 	"errors"
-	"time"
+	"fmt"
+	rErrrors "github.com/hellgate75/rebind/errors"
+	"net"
+	"sync"
 )
 
-type LogRecord struct {
-	Time	time.Time
-	Caller	net.UDPAddr
-}
-
-func NewLogRecord(caller net.UDPAddr) LogRecord {
-	return LogRecord{
-		Time: time.Now(),
-		Caller: caller,
-	}
-}
-
-type LogStore interface {
-	Get(key string) ([]LogRecord, rErrrors.Error)
-	Set(key string, log LogRecord) rErrrors.Error
+type CacheStore interface {
+	Get(key string) ([]net.UDPAddr, rErrrors.Error)
+	Set(key string, log net.UDPAddr) rErrrors.Error
 	Remove(key string) rErrrors.Error
 }
 
-type _callCacheStore struct {
+type CacheStoreData struct {
 	sync.RWMutex
-	store map[string][]LogRecord
+	store map[string][]net.UDPAddr
 }
 
-func (b *_callCacheStore) Get(key string) ([]LogRecord, rErrrors.Error) {
-	internalErr := rErrrors.New(errors.New("Key " + key + " doesn't exist"), int64(20), rErrrors.StoreProcessErrorType)
+func (b *CacheStoreData) Get(key string) ([]net.UDPAddr, rErrrors.Error) {
+	internalErr := rErrrors.New(errors.New("Key "+key+" doesn't exist"), int64(20), rErrrors.StoreProcessErrorType)
 	defer func() {
 		if r := recover(); r != nil {
 			internalErr = rErrrors.New(errors.New(fmt.Sprintf("Runtime error: %s", r)), int64(21), rErrrors.StoreProcessErrorType)
@@ -52,7 +39,7 @@ func (b *_callCacheStore) Get(key string) ([]LogRecord, rErrrors.Error) {
 	return val, internalErr
 }
 
-func (b *_callCacheStore) Set(key string, log LogRecord) rErrrors.Error {
+func (b *CacheStoreData) Set(key string, log net.UDPAddr) rErrrors.Error {
 	var internalErr rErrrors.Error
 	defer func() {
 		if r := recover(); r != nil {
@@ -64,13 +51,13 @@ func (b *_callCacheStore) Set(key string, log LogRecord) rErrrors.Error {
 	if _, ok := b.store[key]; ok {
 		b.store[key] = append(b.store[key], log)
 	} else {
-		b.store[key] = []LogRecord{log}
+		b.store[key] = []net.UDPAddr{log}
 	}
 	return internalErr
 }
 
-func (b *_callCacheStore) Remove(key string) rErrrors.Error {
-	internalErr := rErrrors.New(errors.New("Key " + key + " doesn't exist"), int64(24), rErrrors.StoreProcessErrorType)
+func (b *CacheStoreData) Remove(key string) rErrrors.Error {
+	internalErr := rErrrors.New(errors.New("Key "+key+" doesn't exist"), int64(24), rErrrors.StoreProcessErrorType)
 	defer func() {
 		if r := recover(); r != nil {
 			internalErr = rErrrors.New(errors.New(fmt.Sprintf("Runtime error: %s", r)), int64(25), rErrrors.StoreProcessErrorType)
@@ -86,8 +73,8 @@ func (b *_callCacheStore) Remove(key string) rErrrors.Error {
 	return internalErr
 }
 
-func NewLogStore() LogStore{
-	return &_callCacheStore{
-		store: make(map[string][]LogRecord),
+func NewCacheStore() CacheStore {
+	return &CacheStoreData{
+		store: make(map[string][]net.UDPAddr),
 	}
 }

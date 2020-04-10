@@ -57,19 +57,19 @@ func main() {
 		fmt.Println("Pipe2: Listening for clients ...")
 		for {
 			select {
-				case msg, ok := <- pipe2.GetOutputChannel():
-					if ok {
-						fmt.Printf("Pipe2: Message: %s\n", string(msg))
-						fmt.Println("Pipe2: Complete - Exit!!")
-						wg.Done()
-						pipe2.Stop()
-						return
-					} else {
-						fmt.Println("Pipe2: Message: Error")
-					}
-				case <- time.After(10 * time.Second):
-						break
-				default:
+			case msg, ok := <-pipe2.GetOutputChannel():
+				if ok {
+					fmt.Printf("Pipe2: Message: %s\n", string(msg))
+					fmt.Println("Pipe2: Complete - Exit!!")
+					wg.Done()
+					pipe2.Stop()
+					return
+				} else {
+					fmt.Println("Pipe2: Message: Error")
+				}
+			case <-time.After(10 * time.Second):
+				break
+			default:
 			}
 		}
 	}()
