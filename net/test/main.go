@@ -6,36 +6,27 @@ package main
 
 import (
 	"fmt"
+	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/net"
 	"sync"
 	"time"
 )
 
 func main() {
-	pipe1, err3 := net.New(394, 395)
+	logger := log.NewLogger("test netpipe", log.DEBUG)
+	pipe1, err3 := net.NewOutputPipe(395, nil, logger)
 	if err3 != nil {
 		fmt.Printf("Error creating pipe stream 1: %v", err3)
 		return
 	}
-	defer pipe1.Stop()
-	pipe2, err4 := net.New(395, 394)
+	pipe2, err4 := net.NewInputOutputPipe(395, 395, nil, logger)
 	if err4 != nil {
 		fmt.Printf("Error creating pipe stream 2: %v", err4)
 		return
 	}
 	defer pipe2.Stop()
 
-	go pipe1.Start()
 	go pipe2.Start()
-	//if err3 != nil {
-	//	fmt.Printf("Error starting pipe stream 1: %v\n", err3)
-	//	return
-	//}
-	//
-	//if err4 != nil {
-	//	fmt.Printf("Error starting pipe stream 2: %v\n", err4)
-	//	return
-	//}
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -50,14 +41,14 @@ func main() {
 		}
 		fmt.Println("Pipe1: Complete - Exit!!")
 		wg.Done()
-		pipe1.Stop()
 	}()
 
 	go func() {
 		fmt.Println("Pipe2: Listening for clients ...")
 		for {
+			outChan, _ := pipe2.GetOutputChannel()
 			select {
-			case msg, ok := <-pipe2.GetOutputChannel():
+			case msg, ok := <-outChan:
 				if ok {
 					fmt.Printf("Pipe2: Message: %s\n", string(msg))
 					fmt.Println("Pipe2: Complete - Exit!!")

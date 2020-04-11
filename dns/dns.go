@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/model"
+	pnet "github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/store"
 	"github.com/hellgate75/rebind/utils"
 	"golang.org/x/net/dns/dnsmessage"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -35,16 +37,33 @@ type dnsService struct {
 	Answers    store.AnswersCacheStore
 	Forwarders []net.UDPAddr
 	log        log.Logger
+	pipe       pnet.NetPipe
 	_started   bool
 }
 
+func (s *dnsService) pipeHandler(message string) {
+
+}
+
 // Listen starts a DNS server on port 53
-func (s *dnsService) Listen(ipAddress string, port int) error {
+func (s *dnsService) Listen(ipAddress string, port int, pipeAddress string, pipePort int) error {
 	var err error
 	ipTokens := strings.Split(ipAddress, ".")
 	if len(ipTokens) < 4 {
 		return errs.New(fmt.Sprintf("DNSServer: Invalid ip address: %s", ipAddress))
 	}
+	s.pipe, err = pnet.NewInputPipeWith(pipeAddress, pipePort, pnet.PipeHandler(s.pipeHandler), s.log)
+	if err == nil {
+		err := s.pipe.Start()
+		if err != nil {
+			s.log.Error("Unable to start net pipe on %s:%v", pipeAddress, pipePort)
+			os.Exit(1)
+		}
+	} else {
+		s.log.Error("Unable to create net pipe on %s:%v", pipeAddress, pipePort)
+		os.Exit(1)
+	}
+	defer s.pipe.Stop()
 	var token1, token2, token3, token4 byte
 	intV, _ := strconv.Atoi(ipTokens[0])
 	token1 = byte(intV)
@@ -193,10 +212,10 @@ func New(rwDirPath string, logger log.Logger, forwarders []net.UDPAddr) model.DN
 }
 
 // Start conveniently init every parts of DNS service.
-func Start(rwDirPath string, ip string, port int, logger log.Logger, forwarders []net.UDPAddr) model.DNSServer {
+func Start(rwDirPath string, ip string, port int, pipeIP string, pipePort int, logger log.Logger, forwarders []net.UDPAddr) model.DNSServer {
 	s := New(rwDirPath, logger, forwarders)
 	s.(*dnsService).Store.Load()
-	go s.Listen(ip, port)
+	go s.Listen(ip, port, pipeIP, pipePort)
 	return s
 }
 

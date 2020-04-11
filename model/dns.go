@@ -12,7 +12,7 @@ import (
 
 // DNSServer will do Listen, Query and Send.
 type DNSServer interface {
-	Listen(ipAddress string, port int) error
+	Listen(ipAddress string, port int, pipeAddress string, pipePort int) error
 	Query(Packet)
 	GetService() DNSService
 	Wait()

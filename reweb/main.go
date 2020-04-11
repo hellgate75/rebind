@@ -16,8 +16,10 @@ import (
 )
 
 var rwDirPath = flag.String("rwdir", "/var/dns", "dns storage dir")
-var listenIP = flag.String("listenip", "8.8.8.8", "http forward ip")
-var listenPort = flag.Int("listenport", 9000, "http forward port")
+var listenIP = flag.String("listen-ip", "8.8.8.8", "http server ip")
+var listenPort = flag.Int("listen-port", 9000, "http server port")
+var dnsPipeIP = flag.String("dns-pipe-ip", "127.0.0.1", "tcp dns pipe ip")
+var dnsPipePort = flag.Int("dns-pipe-port", 953, "tcp dns pipe port")
 var tlsCert = flag.String("tsl-cert", "", "tls certificate file path")
 var tlsKey = flag.String("tsl-key", "", "tls certificate key file path")
 
@@ -35,8 +37,8 @@ func main() {
 		logger.Errorf("create rwdirpath: %v error: %v", *rwDirPath, err)
 		return
 	}
-	logger.Info("starting re-bind")
-	pipe, err := net.New(internalListenPort, internalDialPort)
+	logger.Info("starting re-web server ...")
+	pipe, err := net.NewInputOutputPipe(internalListenPort, internalDialPort, nil, logger)
 	if err != nil {
 		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v\n", internalListenPort, internalDialPort)
 	}

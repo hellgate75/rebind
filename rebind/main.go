@@ -27,6 +27,8 @@ var defaultIpAddress = "0.0.0.0"
 var rwDirPath string
 var listenIP string
 var listenPort int
+var dnsPipeIP string
+var dnsPipePort int
 var fwdrsString model.ListArgument
 
 const (
@@ -54,6 +56,8 @@ func init() {
 	flag.StringVar(&rwDirPath, "rwdir", defaultFolder, "dns storage dir")
 	flag.StringVar(&listenIP, "listen-ip", defaultIpAddress, "dns forward ip")
 	flag.IntVar(&listenPort, "listen-port", 53, "dns forward port")
+	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", "127.0.0.1", "tcp dns pipe ip")
+	flag.IntVar(&dnsPipePort, "dns-pipe-port", 953, "tcp dns pipe port")
 	flag.Var(&fwdrsString, "forwarder", "Forwarder address in format \"ipv4|ipv6;port;ipv6zone\" (mutliple values)")
 }
 
@@ -97,7 +101,7 @@ func main() {
 	for _, fw := range defaultForwarders {
 		logger.Infof("Default forwarder : %s:%v[:%s]", fw.IP, fw.Port, fw.Zone)
 	}
-	dnsServer := dns.Start(rwDirPath, listenIP, listenPort, logger, []net.UDPAddr{{IP: net.ParseIP(listenIP), Port: listenPort}})
+	dnsServer := dns.Start(rwDirPath, listenIP, listenPort, dnsPipeIP, dnsPipePort, logger, []net.UDPAddr{{IP: net.ParseIP(listenIP), Port: listenPort}})
 	time.Sleep(5 * time.Second)
 	dnsServer.Wait()
 }
