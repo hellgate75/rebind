@@ -20,8 +20,8 @@ type PipeType byte
 const (
 	DEFAULT_LISTEN_ADDRESS string   = "127.0.0.1"
 	DEFAULT_ANSWER_ADDRESS string   = "127.0.0.1"
-	MIN_PORT_NUMBER        int      = 50
-	MAX_PORT_NUMBER        int      = 25000
+	MIN_PORT_NUMBER        int      = 69
+	MAX_PORT_NUMBER        int      = 55000
 	PIPE_IN                PipeType = iota + 1
 	PIPE_OUT
 	PIPE_INOUT
@@ -125,7 +125,7 @@ func (p *pipe) Start() error {
 			internalError = errors.New(fmt.Sprintf("NetPipe.Start: Runtime error: %v", r))
 		}
 	}()
-	p.log(infoLevel, "NetPipe.Start -> Start listening on port: %v", p.listenPort)
+	p.log(infoLevel, "NetPipe.Start -> Start listening on : %s:%v", p.listenAddress, p.listenPort)
 	p._active = true
 	p.inChan = make(chan []byte)
 	if p._handler == nil {
@@ -147,7 +147,7 @@ func (p *pipe) Stop() {
 		p.log(errorLevel, "NetPipe.Stop: Unable to stop listener for an out pipe")
 		return
 	}
-	p.log(infoLevel, "NetPipe.Stop -> Stop listening on port: %v", p.listenPort)
+	p.log(infoLevel, "NetPipe.Stop -> Stop listening on: %s:%v", p.listenAddress, p.listenPort)
 	p._active = false
 	time.Sleep(500 * time.Millisecond)
 	defer func() {
@@ -178,13 +178,13 @@ func (p *pipe) readOnOutNP() {
 		}
 	}()
 	for p._active {
-		p.log(debugLevel, "NetPipe.ReadThread -> Waiting for connection on port: %v", p.listenPort)
+		p.log(debugLevel, "NetPipe.ReadThread -> Waiting for connection on: %s:%v", p.listenAddress, p.listenPort)
 		var conn net.Conn
 		var err error
 		if conn, err = p.listener.Accept(); err == nil {
 			go p.handleRequest(conn)
 		} else if p._active {
-			p.log(errorLevel, "NetPipe.ReadThread -> Error accepting client on port: %v -> Error: %v", p.listenPort, err)
+			p.log(errorLevel, "NetPipe.ReadThread -> Error accepting client on: %s:%v -> Error: %v", p.listenAddress, p.listenPort, err)
 		}
 
 	}
@@ -224,9 +224,9 @@ func (p *pipe) writeOnChannelRead() {
 			if !ok {
 				continue
 			}
-			outConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%v", p.answerPort))
+			outConn, err := net.Dial("tcp", fmt.Sprintf("%s:%v", p.answerAddress, p.answerPort))
 			if err != nil {
-				p.log(errorLevel, "NetPipe.WriteThread: error dialing on port: %v", err)
+				p.log(errorLevel, "NetPipe.WriteThread: error dialing on: %s:%v, Error: %v", p.answerAddress, p.answerPort, err)
 				panic(err)
 			}
 			p.log(debugLevel, "NetPipe.WriteThread: connected on port: %v", p.answerPort)
@@ -247,7 +247,7 @@ func (p *pipe) handleAnswer(outConn net.Conn, msg []byte) {
 		outConn.Close()
 	}()
 	if outConn != nil {
-		p.log(debugLevel, "NetPipe.HandleAnswer: Sending message at port: %v", p.answerPort)
+		p.log(debugLevel, "NetPipe.HandleAnswer: Sending message at: %s:%v", p.answerAddress, p.answerPort)
 		_, _ = outConn.Write(msg)
 	} else {
 		p.log(errorLevel, "NetPipe.HandleAnswer: Failed to acquire writer")
@@ -279,25 +279,20 @@ func (p *pipe) Write(d []byte) (int, error) {
 		p.log(errorLevel, "NetPipe.Start: Unable to write data for an in pipe")
 		return 0, errors.New("NetPipe.Start: Unable to write data for an in pipe")
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			p.log(errorLevel, "NetPipe.Write: Runtime error: %v", r)
-			p.Stop()
-		}
-	}()
-	p.log(debugLevel, "NetPipe.Write: Connecting on port: %v", p.answerPort)
-	outConn, err := net.Dial("tcp", fmt.Sprintf("%s:%v", p.listenAddress, p.answerPort))
-	if err != nil {
-		panic(err)
-	}
-	defer outConn.Close()
 	var n int
 	defer func() {
 		if r := recover(); r != nil {
 			n = 0
-			err = errors.New(fmt.Sprintf("NetPipe.Write: Runtime error: %v", r))
+			p.log(errorLevel, "NetPipe.Write: Runtime error: %v", r)
+			p.Stop()
 		}
 	}()
+	p.log(debugLevel, "NetPipe.Write: Connecting on: %s:%v", p.answerAddress, p.answerPort)
+	outConn, err := net.Dial("tcp", fmt.Sprintf("%s:%v", p.answerAddress, p.answerPort))
+	if err != nil {
+		panic(err)
+	}
+	defer outConn.Close()
 	if outConn != nil {
 		n, err = outConn.Write(d)
 	} else {
@@ -312,45 +307,43 @@ func New(pType PipeType, inputPort int, outputPort int, handler PipeHandler, log
 
 func NewNetPipe(pType PipeType, listenAddress string, inputPort int, answerAddress string, outputPort int, handler PipeHandler, logger log.Logger) (NetPipe, error) {
 	if pType != PIPE_OUT && (inputPort < MIN_PORT_NUMBER || inputPort > MAX_PORT_NUMBER) {
-		return nil, errors.New(fmt.Sprintf("NetPipe.New: invalid input port: %v", inputPort))
+		return nil, errors.New(fmt.Sprintf("NetPipe.New: invalid input port: %v, range is %v:%v", inputPort, MIN_PORT_NUMBER, MAX_PORT_NUMBER))
 	}
 	if pType != PIPE_IN && (outputPort < MIN_PORT_NUMBER || outputPort > MAX_PORT_NUMBER) {
-		return nil, errors.New(fmt.Sprintf("NetPipe.New: invalid output port: %v", outputPort))
+		return nil, errors.New(fmt.Sprintf("NetPipe.New: invalid output port: %v, range is %v:%v", outputPort, MIN_PORT_NUMBER, MAX_PORT_NUMBER))
 	}
-
-	//if outputPort == inputPort {
-	//	return nil, errors.New("NetPipe.New: input and output port must be different")
-	//}
 
 	if pType != PIPE_IN && pType != PIPE_OUT && pType != PIPE_INOUT {
-		return nil, errors.New(fmt.Sprintf("NetPipe.New: Unknown pipe type: %v", pType))
+		return nil, errors.New(fmt.Sprintf("NetPipe.New: Unknown Net-Pipe of Type: %v, available are PIPE_IN(%v), PIPE_OUT(%v) or PIPE_INOUT(%v)", pType, PIPE_IN, PIPE_OUT, PIPE_INOUT))
 	} else {
 		if logger != nil {
-			logger.Infof("NetPipe.New: Creating Pipe Type: %s", pType.String())
+			logger.Infof("NetPipe.New: Creating Net-Pipe of Type: %s", pType.String())
 		} else {
-			fmt.Printf("[INFO ] NetPipe.New: Creating Pipe Type: %s\n", pType.String())
+			fmt.Printf("[INFO ] NetPipe.New: Creating Net-Pipe of Type: %s\n", pType.String())
 		}
 	}
-	if handler == nil {
+	if handler != nil {
 		if logger != nil {
-			logger.Warn("NetPipe.New: handler is provided, proceeding with input handler ...")
+			logger.Warn("NetPipe.New: Pipe-Handler is provided, proceeding with input handler ...")
 		} else {
-			fmt.Println("[WARN ] NetPipe.New: handler is provided, proceeding with input handler ...")
+			fmt.Println("[WARN ] NetPipe.New: Pipe-Handler is provided, proceeding with input handler ...")
 		}
 	} else {
 		if logger != nil {
-			logger.Warn("NetPipe.New: handler is nil, proceeding with input channel ...")
+			logger.Warn("NetPipe.New: Pipe-Handler is nil, proceeding with input channel ...")
 		} else {
-			fmt.Println("[WARN ] NetPipe.New: handler is nil, proceeding with input channel ...")
+			fmt.Println("[WARN ] NetPipe.New: Pipe-Handler is nil, proceeding with input channel ...")
 		}
 	}
 
 	return &pipe{
-		_pType:     pType,
-		listenPort: inputPort,
-		answerPort: outputPort,
-		_handler:   handler,
-		_log:       logger,
+		_pType:        pType,
+		listenPort:    inputPort,
+		answerPort:    outputPort,
+		listenAddress: listenAddress,
+		answerAddress: answerAddress,
+		_handler:      handler,
+		_log:          logger,
 	}, nil
 
 }

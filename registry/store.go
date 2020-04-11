@@ -28,6 +28,7 @@ type Store interface {
 	Save()
 	Load()
 	Clone() map[string]store.GroupStore
+	GetGroupBucket() *data.GroupsBucket
 }
 
 // Create New Store with a logger and the rw config directory path
@@ -49,6 +50,10 @@ type _store struct {
 	rwDirPath  string
 	log        log.Logger
 	forwarders []net.UDPAddr
+}
+
+func (s *_store) GetGroupBucket() *data.GroupsBucket {
+	return &s.store
 }
 
 func (s *_store) Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, bool) {

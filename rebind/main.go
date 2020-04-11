@@ -17,13 +17,6 @@ import (
 	"time"
 )
 
-var defaultFolder string = "/Users/Fabrizio/var/dns"
-
-//var defaultFolder string = "/var/dns"
-var defaultIpAddress = "0.0.0.0"
-
-//var defaultIpAddress = "8.8.8.8"
-
 var rwDirPath string
 var listenIP string
 var listenPort int
@@ -31,43 +24,33 @@ var dnsPipeIP string
 var dnsPipePort int
 var fwdrsString model.ListArgument
 
-const (
-	internalListenPort int = 953
-	internalDialPort   int = 954
-)
+var logger = log.NewLogger("re-bind", log.DEBUG)
 
-//TODO: Give Life to File Logger
-//var logger log.Logger = log.NewLogger("re-bind", log.INFO)
-var logger log.Logger = log.NewLogger("re-bind", log.DEBUG)
-
-var defaultForwarders []net.UDPAddr = []net.UDPAddr{
-	net.UDPAddr{
-		IP:   net.IPv4(8, 8, 8, 8),
-		Port: 53,
-	},
-	net.UDPAddr{
-		IP:   net.IPv4(8, 8, 4, 4),
-		Port: 53,
-	},
-}
+var defaultForwarders = make([]net.UDPAddr, 0)
 
 func init() {
-	logger.Info("Initializing Re-Bind ....")
-	flag.StringVar(&rwDirPath, "rwdir", defaultFolder, "dns storage dir")
-	flag.StringVar(&listenIP, "listen-ip", defaultIpAddress, "dns forward ip")
-	flag.IntVar(&listenPort, "listen-port", 53, "dns forward port")
-	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", "127.0.0.1", "tcp dns pipe ip")
-	flag.IntVar(&dnsPipePort, "dns-pipe-port", 953, "tcp dns pipe port")
+	logger.Info("Initializing Re-Bind DNS Server ....")
+	flag.StringVar(&rwDirPath, "rwdir", model.DefaultStorageFolder, "dns storage dir")
+	flag.StringVar(&listenIP, "listen-ip", model.DefaultIpAddress, "dns forward ip")
+	flag.IntVar(&listenPort, "listen-port", model.DefaultDnsServerPort, "dns forward port")
+	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", model.DefaultDnsPipeAddress, "tcp dns pipe ip")
+	flag.IntVar(&dnsPipePort, "dns-pipe-port", model.DefaultDnsPipePort, "tcp dns pipe port")
 	flag.Var(&fwdrsString, "forwarder", "Forwarder address in format \"ipv4|ipv6;port;ipv6zone\" (mutliple values)")
 }
 
 func main() {
+	logger.Info("Starting Re-Bind DNS Server ...")
 	flag.Parse()
 	if utils.StringsListContainItem("-h", flag.Args(), true) ||
 		utils.StringsListContainItem("--help", flag.Args(), true) {
 		flag.Usage()
 		os.Exit(0)
 	}
+	if err := os.MkdirAll(rwDirPath, 0666); err != nil {
+		logger.Errorf("Create rwdirpath: %v error: %v", rwDirPath, err)
+		return
+	}
+	defaultForwarders = append(defaultForwarders, model.DefaultGroupForwarders...)
 	for _, fw := range fwdrsString {
 		list := strings.Split(fw, ";")
 		var ip net.IP
@@ -91,11 +74,6 @@ func main() {
 			})
 		}
 	}
-	if err := os.MkdirAll(rwDirPath, 0666); err != nil {
-		logger.Errorf("create rwdirpath: %v error: %v", rwDirPath, err)
-		return
-	}
-	logger.Info("Starting re-bind dns server ...")
 	logger.Infof("Required ip address : %v", listenIP)
 	logger.Infof("Required port : %v", listenPort)
 	for _, fw := range defaultForwarders {

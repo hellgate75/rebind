@@ -59,6 +59,11 @@ func (i *GroupsBucket) Load(defaultForwarders []net.UDPAddr) error {
 	}()
 	fileName := fmt.Sprintf("%s%sgroups.yaml", i.Folder, __sepPath)
 	if _, err := os.Stat(fileName); err != nil {
+		if i.log != nil {
+			i.log.Infof("Missing default group storage: Creating file: %s", fileName)
+		} else {
+			fmt.Printf("[info ] Missing default group storage: Creating file: %s\n", fileName)
+		}
 		_, _, err = i.CreateAndPersistGroupAndStore("default", []string{}, defaultForwarders)
 		if err == nil {
 			err = i.SaveMeta()
@@ -93,6 +98,13 @@ func (i *GroupsBucket) ReLoad() error {
 		return mErr
 	}
 	return nil
+}
+
+func (i *GroupsBucket) Contains(group string) bool {
+	if _, ok := i.Groups[utils.ConvertKeyToId(group)]; ok {
+		return true
+	}
+	return false
 }
 
 func (i *GroupsBucket) Keys() []string {
@@ -343,6 +355,14 @@ func (i *GroupsBucket) UpdateExistingGroup(group *Group) bool {
 		return true
 	}
 	return false
+}
+
+func (i *GroupsBucket) ListGroups() []*Group {
+	var out = make([]*Group, 0)
+	for _, g := range i.Groups {
+		out = append(out, &g)
+	}
+	return out
 }
 
 func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group) (*Group, error) {

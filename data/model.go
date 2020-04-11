@@ -7,19 +7,19 @@ import (
 )
 
 type Group struct {
-	Name       string        `yaml:"name" json:"name" xml:"name,chardata"`
-	File       string        `yaml:"file" json:"file" xml:"file,chardata"`
-	NumRecs    int64         `yaml:"numberOfRecords" json:"numberOfRecords" xml:"number-of-records,chardata"`
-	Domains    []string      `yaml:"domains,omitempty" json:"domains,omitempty" xml:"domains,chardata,omitempty"`
-	Forwarders []net.UDPAddr `yaml:"forwarders,omitempty" json:"forwarders,omitempty" xml:"forwarders,chardata,omitempty"`
+	Name       string        `yaml:"name" json:"name" xml:"name"`
+	File       string        `yaml:"file" json:"file" xml:"file"`
+	NumRecs    int64         `yaml:"numberOfRecords" json:"numberOfRecords" xml:"number-of-records"`
+	Domains    []string      `yaml:"domains,omitempty" json:"domains,omitempty" xml:"domains,omitempty"`
+	Forwarders []net.UDPAddr `yaml:"forwarders,omitempty" json:"forwarders,omitempty" xml:"forwarders,omitempty"`
 }
 
 type GroupsBucket struct {
 	sync.Mutex
 	storeMutex sync.Mutex
 	log        log.Logger
-	Folder     string           `yaml:"dataFolder" json:"dataFolder" xml:"data-folder,chardata"`
-	Groups     map[string]Group `yaml:"groups" json:"groups" xml:"groups,chardata"`
+	Folder     string           `yaml:"dataFolder" json:"dataFolder" xml:"data-folder"`
+	Groups     map[string]Group `yaml:"groups" json:"groups" xml:"groups"`
 }
 
 func NewGroupsBucket(folder string, log log.Logger) GroupsBucket {
