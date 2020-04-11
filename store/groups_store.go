@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var DEFAULT_TIME_TO_LIVE time.Duration = 5 * time.Minute
+var DEFAULT_GROUP_CACHE_TIME_TO_LIVE time.Duration = 5 * time.Minute
 
 // Defines the behaviour od a multi-zone tenant storage
 type GroupsStore interface {
@@ -163,7 +163,7 @@ func (b *GroupsStoreData) Set(key string, store GroupStore) rErrrors.Error {
 		b.store[key] = GroupStoreMeta{
 			Store:   store,
 			Created: time.Now(),
-			TTL:     DEFAULT_TIME_TO_LIVE,
+			TTL:     DEFAULT_GROUP_CACHE_TIME_TO_LIVE,
 		}
 
 		internalErr = nil

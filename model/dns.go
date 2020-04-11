@@ -7,6 +7,7 @@ package model
 import (
 	"golang.org/x/net/dns/dnsmessage"
 	"net"
+	"time"
 )
 
 // DNSServer will do Listen, Query and Send.
@@ -18,7 +19,7 @@ type DNSServer interface {
 }
 
 type DNSService interface {
-	Save(key string, resource dnsmessage.Resource, old *dnsmessage.Resource) bool
+	Save(key string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool
 	SaveBulk(key string, resources []dnsmessage.Resource)
 	All() []Get
 	Remove(key string, r *dnsmessage.Resource) bool
@@ -30,3 +31,14 @@ type Packet struct {
 	Message dnsmessage.Message
 }
 
+// Collects indformation about any answer
+type AnswerBlock struct {
+	Created time.Time
+	TTL     time.Duration
+	Answer  []dnsmessage.Resource
+}
+
+func (answer *AnswerBlock) IsValid() bool {
+	return int64((time.Now().Nanosecond() - answer.Created.Nanosecond())) >= int64(answer.TTL.Nanoseconds())
+
+}

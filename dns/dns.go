@@ -31,7 +31,8 @@ const (
 type dnsService struct {
 	Conn       *net.UDPConn
 	Store      registry.Store
-	Bucket     store.CacheStore
+	Bucket     store.RequestsCacheStore
+	Answers    store.AnswersCacheStore
 	Forwarders []net.UDPAddr
 	log        log.Logger
 	_started   bool
@@ -98,7 +99,9 @@ func (s *dnsService) Query(p model.Packet) {
 				go sendPacket(s.Conn, p.Message, address)
 			}
 			s.Bucket.Remove(pKey)
-			go s.SaveBulk(utils.QToString(p.Message.Questions[0]), p.Message.Answers)
+			qRep, _ := utils.ReplaceQuestionUnrelated(utils.QToString(p.Message.Questions[0]))
+			go s.SaveBulk(qRep, p.Message.Answers)
+			s.Answers.Set(qRep, p.Message.Answers...)
 		}
 		return
 	}
@@ -128,22 +131,27 @@ func (s *dnsService) Query(p model.Packet) {
 	s.log.Debugf("UDPADDR->Port: %v", p.Addr.Port)
 
 	//Recover by zone, the by question
-	//TODO Fix it ( insert first cache check ....)
-
 	// was checked before entering this routine
-	q := p.Message.Questions[0]
-
-	// answer the question
-	val, ok := s.Store.Get(utils.QToString(q))
-
-	if ok {
-		p.Message.Answers = append(p.Message.Answers, val...)
+	if dnsRes, err := s.Answers.Get(qRep); err == nil {
+		//Taking from cache
+		p.Message.Answers = append(p.Message.Answers, dnsRes...)
 		go sendPacket(s.Conn, p.Message, p.Addr)
 	} else {
-		// forwarding
-		for i := 0; i < len(s.Forwarders); i++ {
-			s.Bucket.Set(utils.PToString(p), p.Addr)
-			go sendPacket(s.Conn, p.Message, s.Forwarders[i])
+		// answer the question
+		// seeking into the store
+		val, fwds, ok := s.Store.Get(qRep)
+		if ok && len(val) > 0 {
+			s.Answers.Set(qRep, val...)
+			p.Message.Answers = append(p.Message.Answers, val...)
+			go sendPacket(s.Conn, p.Message, p.Addr)
+		} else if len(fwds) > 0 {
+			// forwarding
+			for i := 0; i < len(fwds); i++ {
+				s.Bucket.Set(utils.PToString(p), p.Addr)
+				go sendPacket(s.Conn, p.Message, s.Forwarders[i])
+			}
+		} else {
+			s.log.Warnf("Request: %s has 0 records")
 		}
 	}
 }
@@ -177,7 +185,8 @@ func sendPacket(conn *net.UDPConn, message dnsmessage.Message, addr net.UDPAddr)
 func New(rwDirPath string, logger log.Logger, forwarders []net.UDPAddr) model.DNSServer {
 	return &dnsService{
 		Store:      registry.NewStore(logger, rwDirPath, forwarders),
-		Bucket:     store.NewCacheStore(),
+		Bucket:     store.NewRequestsCacheStore(),
+		Answers:    store.NewAnswersCacheStore(),
 		Forwarders: forwarders,
 		log:        logger,
 	}
@@ -191,10 +200,9 @@ func Start(rwDirPath string, ip string, port int, logger log.Logger, forwarders 
 	return s
 }
 
-func (s *dnsService) Save(key string, resource dnsmessage.Resource, old *dnsmessage.Resource) bool {
-	ok := s.Store.Set(key, resource, old)
+func (s *dnsService) Save(key string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool {
+	ok := s.Store.Set(key, resource, addr, recordData, old)
 	go s.Store.Save()
-
 	return ok
 }
 

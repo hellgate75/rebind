@@ -291,3 +291,6 @@ func ToResourceHeader(name string, sType string) (h dnsmessage.ResourceHeader, e
 	h.Type = ToRType(sType)
 	return
 }
+func ConvertKeyToId(key string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, ".", "-"), " ", "-"))
+}

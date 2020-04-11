@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 )
 
 func init() {
@@ -25,10 +24,6 @@ func init() {
 	gob.Register(&dnsmessage.SRVResource{})
 	gob.Register(&dnsmessage.TXTResource{})
 	gob.Register(&dnsmessage.PTRResource{})
-	gob.Register(&store.GroupsStoreData{})
-	gob.Register(&store.GroupStoreData{})
-	gob.Register(&store.CacheStoreData{})
-	gob.Register(&store.GroupStorePersistent{})
 
 	gob.Register(&dnsmessage.Resource{})
 	gob.Register(&dnsmessage.ResourceHeader{})
@@ -38,6 +33,11 @@ func init() {
 	gob.Register(&dnsmessage.Option{})
 	gob.Register(&dnsmessage.OPTResource{})
 	gob.Register(&dnsmessage.Question{})
+
+	gob.Register(&store.GroupsStoreData{})
+	gob.Register(&store.GroupStoreData{})
+	gob.Register(&store.AnswersCacheStoreData{})
+	gob.Register(&store.GroupStorePersistent{})
 
 	gob.Register(&Group{})
 	gob.Register(&GroupsBucket{})
@@ -172,11 +172,11 @@ func (i *GroupsBucket) SaveMeta() error {
 	return err
 }
 func (i *GroupsBucket) ConvertToGroupLikeKey(key string) string {
-	return convertKeyToId(key)
+	return utils.ConvertKeyToId(key)
 }
 func (i *GroupsBucket) CreateUnboundGroup(key string, domains []string,
 	forwarders []net.UDPAddr) *Group {
-	def := convertKeyToId(key)
+	def := utils.ConvertKeyToId(key)
 	return &Group{
 		Name:       def,
 		Domains:    domains,
@@ -217,9 +217,14 @@ func (i *GroupsBucket) GetGroupsByDomain(domain string) ([]*Group, error) {
 	return out, errors.New(fmt.Sprintf("Unable to find group by domain: %s", domain))
 }
 
+var cache = make(map[*Group]*store.GroupStoreData)
+
 func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error) {
 	if group == nil {
 		return nil, errors.New("Unable to load groupStore by nil group ...")
+	}
+	if gs, ok := cache[group]; ok {
+		return gs, nil
 	}
 	var err error
 	defer func() {
@@ -270,18 +275,19 @@ func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error
 	groupStore.Forwarders = group.Forwarders
 	groupStore.Domains = group.Domains
 	groupStore.GroupName = group.Name
+	cache[group] = &groupStore
 	return &groupStore, err
 }
 
 func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 	keys := groupsStore.Keys()
 	for _, key := range keys {
-		def := convertKeyToId(key)
+		def := utils.ConvertKeyToId(key)
 		zStore, err := groupsStore.Get(key)
-		var fwdrs []net.UDPAddr = make([]net.UDPAddr, 0)
+		var forwards = make([]net.UDPAddr, 0)
 		var length int64 = 0
 		if err == nil {
-			fwdrs = append(fwdrs, zStore.GetForwarders()...)
+			forwards = utils.RemoveDuplicatesInUpdAddrList(append(forwards, zStore.GetForwarders()...))
 			for _, key := range zStore.Keys() {
 				el, _ := zStore.Get(key)
 				length += int64(len(el))
@@ -291,7 +297,7 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 			i.Groups[key] = Group{
 				Name:       def,
 				Domains:    []string{key},
-				Forwarders: fwdrs,
+				Forwarders: forwards,
 				NumRecs:    length,
 				File:       fmt.Sprintf("gob-%s.dat", def),
 			}
@@ -299,7 +305,7 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 	}
 
 	for _, key := range keys {
-		def := convertKeyToId(key)
+		def := utils.ConvertKeyToId(key)
 		if groupCfg, ok := i.Groups[def]; ok {
 			zStore, err := groupsStore.Get(key)
 			if err != nil {
@@ -329,6 +335,14 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 		}
 	}
 	return i.SaveMeta()
+}
+
+func (i *GroupsBucket) UpdateExistingGroup(group *Group) bool {
+	if _, ok := i.Groups[group.Name]; ok {
+		i.Groups[group.Name] = *group
+		return true
+	}
+	return false
 }
 
 func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group) (*Group, error) {
@@ -386,9 +400,6 @@ func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group)
 		}
 		return nil, err
 	}
+	cache[group] = groupStore
 	return group, err
-}
-
-func convertKeyToId(key string) string {
-	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, ".", "-"), " ", "-"))
 }

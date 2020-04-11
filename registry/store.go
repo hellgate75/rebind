@@ -9,19 +9,22 @@ import (
 	"github.com/hellgate75/rebind/data"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/store"
+	"github.com/hellgate75/rebind/utils"
 	"golang.org/x/net/dns/dnsmessage"
 	"net"
+	"strings"
 	"sync"
+	"time"
 )
 
 //TODO: Consider removing gof for file-save mode
 //TODO: Link output to GroupsStore instead of the dnsmessage _store
 
 type Store interface {
-	Get(key string) ([]dnsmessage.Resource, bool)
-	Set(key string, resource dnsmessage.Resource, old *dnsmessage.Resource) bool
-	Override(key string, resources []dnsmessage.Resource)
-	Remove(key string, r *dnsmessage.Resource) bool
+	Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, bool)
+	Set(hostname string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool
+	Override(hostname string, resources []dnsmessage.Resource)
+	Remove(hostname string, r *dnsmessage.Resource) bool
 	Save()
 	Load()
 	Clone() map[string]store.GroupStore
@@ -48,38 +51,149 @@ type _store struct {
 	forwarders []net.UDPAddr
 }
 
-func (s *_store) Get(key string) ([]dnsmessage.Resource, bool) {
-	var out []dnsmessage.Resource = make([]dnsmessage.Resource, 0)
-	var ok bool = false
+func (s *_store) Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, bool) {
+	var ok = true
 	s.RLock()
 	defer func() {
 		if r := recover(); r != nil {
 			if s.log != nil {
 				s.log.Errorf(fmt.Sprintf("Store.Get::Runtime error: %v", r))
+				ok = false
 			}
 		}
 		s.RUnlock()
 	}()
-	// TODO: Here code to get all matching resources
-	return out, ok
+	domains := utils.SplitDomainsFromHostname(hostname)
+	var res = make([]dnsmessage.Resource, 0)
+	var fwd = make([]net.UDPAddr, 0)
+
+	var groups = make(map[string]*data.Group, 0)
+	for _, domain := range domains {
+		gr, err := s.store.GetGroupsByDomain(domain)
+		if err == nil || len(gr) == 0 {
+			s.log.Error("Store.Get:: Unable to get Store from domain/sub-domain: %s, due to Error: %v", domain, err)
+			ok = false
+			continue
+		}
+		for _, g := range gr {
+			groups[g.Name] = g
+		}
+	}
+	for _, g := range groups {
+		fwd = append(fwd, g.Forwarders...)
+		sg, err := s.store.GetGroupStore(g)
+		if err != nil {
+			s.log.Error("Store.Get:: Unable to get Store from file, due to Error: %v", err)
+			continue
+		}
+		recs, errR := sg.Get(hostname)
+		if errR != nil {
+			s.log.Error("Store.Get:: Unable to discover for host: %s, due to Error: %v", hostname, errR.Error())
+			continue
+		}
+		for _, r := range recs {
+			for _, m := range r.Resources {
+				res = append(res, m.Resource)
+			}
+		}
+	}
+	return res, fwd, ok
 }
 
-func (s *_store) Set(key string, resource dnsmessage.Resource, old *dnsmessage.Resource) bool {
+func (s *_store) GetGroupsFromHost(hostname string) ([]*data.Group, error) {
+	return nil, nil
+	server := strings.Split(hostname, ".")[0]
+	domains := utils.SplitDomainsFromHostname(hostname)
+	if len(domains) == 1 && (domains[0] == "" || utils.IsDefaultGroupDomain(domains[0])) {
+		hostname = server
+	}
+	var groups = make([]*data.Group, 0)
+	for _, domain := range domains {
+		gr, err := s.store.GetGroupsByDomain(domain)
+		if err == nil || len(gr) == 0 {
+			s.log.Error("Store.GetGroupsFromHost:: Unable to get Store from domain/sub-domain: %s, due to Error: %v", domain, err)
+			continue
+		}
+		groups = append(groups, gr...)
+	}
+	return groups, nil
+}
+
+func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool {
+	ok := true
 	changed := false
 	s.Lock()
 	defer func() {
 		if r := recover(); r != nil {
 			if s.log != nil {
 				s.log.Errorf(fmt.Sprintf("Store.Set::Runtime error: %v", r))
+				ok = false
 			}
 		}
 		s.Unlock()
 	}()
-	// TODO: Here code for set/update (accumulate records...)
-	return changed
+	server := strings.Split(hostname, ".")[0]
+	domains := utils.SplitDomainsFromHostname(hostname)
+	if len(domains) == 1 && (domains[0] == "" || utils.IsDefaultGroupDomain(domains[0])) {
+		hostname = server
+	}
+
+	var fwd = make([]net.UDPAddr, 0)
+	storeMeta := store.RecordMeta{
+		Resource: resource,
+		TTL:      resource.Header.TTL,
+		Created:  time.Now(),
+		Data:     recordData,
+		Addr:     addr,
+	}
+	var groups = make(map[string]*data.Group, 0)
+	for _, domain := range domains {
+		gr, err := s.store.GetGroupsByDomain(domain)
+		if err == nil || len(gr) == 0 {
+			s.log.Error("Store.Set:: Unable to get Store from domain/sub-domain: %s, due to Error: %v", domain, err)
+			ok = false
+			continue
+		}
+		for _, g := range gr {
+			groups[g.Name] = g
+		}
+	}
+	var change = false
+	for _, g := range groups {
+		fwd = append(fwd, g.Forwarders...)
+		sg, err := s.store.GetGroupStore(g)
+		if err != nil {
+			s.log.Error("Store.Set:: Unable to get Store from file, due to Error: %v", err)
+			continue
+		}
+		sg.Forwarders = append(sg.Forwarders, fwd...)
+		sg.Forwarders = utils.RemoveDuplicatesInUpdAddrList(sg.Forwarders)
+		recs, errR := sg.Get(hostname)
+		if errR != nil || len(recs) == 0 {
+			sg.Set(hostname, store.DNSRecord{
+				Resources: []store.RecordMeta{storeMeta},
+				Type:      resource.Header.Type.String(),
+				NodeName:  hostname,
+			})
+		} else {
+			sg.Set(hostname, store.DNSRecord{
+				Resources: []store.RecordMeta{storeMeta},
+				Type:      resource.Header.Type.String(),
+				NodeName:  hostname,
+			})
+		}
+		g, err = s.store.SaveGroup(sg, g)
+		if s.store.UpdateExistingGroup(g) {
+			change = true
+		}
+	}
+	if change {
+		s.store.SaveMeta()
+	}
+	return ok && changed
 }
 
-func (s *_store) Override(key string, resources []dnsmessage.Resource) {
+func (s *_store) Override(hostname string, resources []dnsmessage.Resource) {
 	s.Lock()
 	defer func() {
 		if r := recover(); r != nil {
@@ -89,10 +203,69 @@ func (s *_store) Override(key string, resources []dnsmessage.Resource) {
 		}
 		s.Unlock()
 	}()
-	//TODO: Here code for overriding values...
+	if len(resources) == 0 {
+		s.log.Error("Store.Override:: error: Resource are empty, please remove instead of update empty")
+		return
+	}
+	var dnsRecords = make([]store.DNSRecord, 0)
+	for _, resource := range resources {
+		var addr *net.IPAddr = nil
+		rec := store.DNSRecord{
+			NodeName: hostname,
+			Type:     resource.Header.Type.String(),
+			Resources: []store.RecordMeta{
+				{
+					Resource: resource,
+					TTL:      resource.Header.TTL,
+					Created:  time.Now(),
+					Data:     resource.Body.GoString(),
+					Addr:     *addr,
+				},
+			},
+		}
+
+		dnsRecords = append(dnsRecords, rec)
+	}
+	server := strings.Split(hostname, ".")[0]
+	domains := utils.SplitDomainsFromHostname(hostname)
+	if len(domains) == 1 && (domains[0] == "" || utils.IsDefaultGroupDomain(domains[0])) {
+		hostname = server
+	}
+
+	var groups = make([]*data.Group, 0)
+	for _, domain := range domains {
+		gr, err := s.store.GetGroupsByDomain(domain)
+		if err == nil || len(gr) == 0 {
+			s.log.Error("Store.Override:: Unable to get Store from domain/sub-domain: %s, due to Error: %v", domain, err)
+			continue
+		}
+		groups = append(groups, gr...)
+	}
+	var change = false
+	var fwd = make([]net.UDPAddr, 0)
+	for _, g := range groups {
+		fwd = append(fwd, g.Forwarders...)
+		sg, err := s.store.GetGroupStore(g)
+		if err != nil {
+			s.log.Error("Store.Override:: Unable to get Store from file, due to Error: %v", err)
+			continue
+		}
+		sg.Forwarders = append(sg.Forwarders, fwd...)
+		sg.Forwarders = utils.RemoveDuplicatesInUpdAddrList(sg.Forwarders)
+		errR := sg.Replace(hostname, dnsRecords)
+		if errR == nil {
+			g, err = s.store.SaveGroup(sg, g)
+			if s.store.UpdateExistingGroup(g) {
+				change = true
+			}
+		}
+	}
+	if change {
+		s.store.SaveMeta()
+	}
 }
 
-func (s *_store) Remove(key string, r *dnsmessage.Resource) bool {
+func (s *_store) Remove(hostname string, r *dnsmessage.Resource) bool {
 	ok := false
 	s.Lock()
 	defer func() {

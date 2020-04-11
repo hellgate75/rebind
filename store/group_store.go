@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 	"net"
 	"sync"
+	"time"
 )
 
 type RecordMeta struct {
@@ -18,7 +19,7 @@ type RecordMeta struct {
 	Data     string
 	Resource dnsmessage.Resource
 	TTL      uint32
-	Created  int64
+	Created  time.Time
 }
 
 type DNSRecord struct {
@@ -126,6 +127,22 @@ func (b *GroupStoreData) Set(key string, record DNSRecord) rErrrors.Error {
 		b.store[key] = append(b.store[key], record)
 	} else {
 		b.store[key] = []DNSRecord{record}
+	}
+	return internalErr
+}
+func (b *GroupStoreData) Replace(key string, records []DNSRecord) rErrrors.Error {
+	var internalErr rErrrors.Error
+	defer func() {
+		if r := recover(); r != nil {
+			internalErr = rErrrors.New(errors.New(fmt.Sprintf("Runtime error: %s", r)), int64(23), rErrrors.StoreProcessErrorType)
+		}
+		b.Unlock()
+	}()
+	b.Lock()
+	if _, ok := b.store[key]; ok {
+		b.store[key] = records
+	} else {
+		b.store[key] = records
 	}
 	return internalErr
 }

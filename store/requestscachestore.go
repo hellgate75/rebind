@@ -12,18 +12,18 @@ import (
 	"sync"
 )
 
-type CacheStore interface {
+type RequestsCacheStore interface {
 	Get(key string) ([]net.UDPAddr, rErrrors.Error)
 	Set(key string, log net.UDPAddr) rErrrors.Error
 	Remove(key string) rErrrors.Error
 }
 
-type CacheStoreData struct {
+type RequestsCacheStoreData struct {
 	sync.RWMutex
 	store map[string][]net.UDPAddr
 }
 
-func (b *CacheStoreData) Get(key string) ([]net.UDPAddr, rErrrors.Error) {
+func (b *RequestsCacheStoreData) Get(key string) ([]net.UDPAddr, rErrrors.Error) {
 	internalErr := rErrrors.New(errors.New("Key "+key+" doesn't exist"), int64(20), rErrrors.StoreProcessErrorType)
 	defer func() {
 		if r := recover(); r != nil {
@@ -39,7 +39,7 @@ func (b *CacheStoreData) Get(key string) ([]net.UDPAddr, rErrrors.Error) {
 	return val, internalErr
 }
 
-func (b *CacheStoreData) Set(key string, log net.UDPAddr) rErrrors.Error {
+func (b *RequestsCacheStoreData) Set(key string, log net.UDPAddr) rErrrors.Error {
 	var internalErr rErrrors.Error
 	defer func() {
 		if r := recover(); r != nil {
@@ -56,7 +56,7 @@ func (b *CacheStoreData) Set(key string, log net.UDPAddr) rErrrors.Error {
 	return internalErr
 }
 
-func (b *CacheStoreData) Remove(key string) rErrrors.Error {
+func (b *RequestsCacheStoreData) Remove(key string) rErrrors.Error {
 	internalErr := rErrrors.New(errors.New("Key "+key+" doesn't exist"), int64(24), rErrrors.StoreProcessErrorType)
 	defer func() {
 		if r := recover(); r != nil {
@@ -73,8 +73,8 @@ func (b *CacheStoreData) Remove(key string) rErrrors.Error {
 	return internalErr
 }
 
-func NewCacheStore() CacheStore {
-	return &CacheStoreData{
+func NewRequestsCacheStore() RequestsCacheStore {
+	return &RequestsCacheStoreData{
 		store: make(map[string][]net.UDPAddr),
 	}
 }
