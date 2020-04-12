@@ -41,8 +41,9 @@ func init() {
 
 	gob.Register(&Group{})
 	gob.Register(&GroupsBucket{})
+	gob.Register(&GroupBlock{})
+	gob.Register(&groupBucketPersitence{})
 	gob.Register(&store.DNSRecord{})
-	gob.Register(&store.RecordMeta{})
 	gob.Register(&net.UDPAddr{})
 }
 
@@ -88,7 +89,8 @@ func (i *GroupsBucket) ReLoad() error {
 		}
 		return rErr
 	}
-	mErr := yaml.Unmarshal(arr, i)
+	var bucket groupBucketPersitence
+	mErr := yaml.Unmarshal(arr, &bucket)
 	if mErr != nil {
 		if i.log != nil {
 			i.log.Errorf("GroupsBucket:: [ERROR] Error converting groups main index, Error: %v", mErr)
@@ -97,6 +99,7 @@ func (i *GroupsBucket) ReLoad() error {
 		}
 		return mErr
 	}
+	i.Groups = bucket.Groups
 	return nil
 }
 
@@ -118,7 +121,7 @@ func (i *GroupsBucket) CreateAndPersistGroupAndStore(key string, domains []strin
 	forwarders []net.UDPAddr) (Group, store.GroupStoreData, error) {
 	groupRef := i.CreateUnboundGroup(key, domains, forwarders)
 	groupStore := store.NewGroupStore(groupRef.Name, domains, forwarders)
-	var gsd  = *(groupStore.(*store.GroupStoreData))
+	var gsd = *(groupStore.(*store.GroupStoreData))
 	groupRef, err := i.SaveGroup(gsd, groupRef)
 	if err != nil {
 		if i.log != nil {
@@ -157,7 +160,10 @@ func (i *GroupsBucket) SaveMeta() error {
 		i.Unlock()
 	}()
 	i.Lock()
-	arr, mErr := yaml.Marshal(i)
+	persistence := groupBucketPersitence{
+		Groups: i.Groups,
+	}
+	arr, mErr := yaml.Marshal(&persistence)
 	if mErr != nil {
 		if i.log != nil {
 			i.log.Errorf("GroupsBucket:: [ERROR] Error converting groups main index, Error: %v", mErr)
@@ -246,8 +252,8 @@ func (i *GroupsBucket) GetGroupsByDomain(domain string) ([]Group, error) {
 }
 
 type GroupBlock struct {
-	Group	Group
-	Data	store.GroupStoreData
+	Group Group
+	Data  store.GroupStoreData
 }
 
 var cache = make(map[string]GroupBlock)
@@ -307,7 +313,7 @@ func (i *GroupsBucket) GetGroupStore(group Group) (store.GroupStoreData, error) 
 	groupStore.GroupName = group.Name
 	cache[group.Name] = GroupBlock{
 		Group: group,
-		Data: groupStore,
+		Data:  groupStore,
 	}
 	return groupStore, err
 }
@@ -443,7 +449,7 @@ func (i *GroupsBucket) SaveGroup(groupStore store.GroupStoreData, group Group) (
 	}
 	cache[group.Name] = GroupBlock{
 		Group: group,
-		Data: groupStore,
+		Data:  groupStore,
 	}
 	return group, err
 }

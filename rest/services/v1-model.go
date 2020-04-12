@@ -1,8 +1,4 @@
-// Copyright 2020 Re-Bind Author (Fabrizio Torelli). All rights reserved.
-// Use of this source code is governed by a LGPL-style
-// license that can be found in the LICENSE file.
-
-package rest
+package services
 
 import (
 	"github.com/hellgate75/rebind/log"
@@ -17,6 +13,14 @@ type RestService interface {
 	Read(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
+}
+
+func NewV1DnsRootRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+	return &v1.DnsRootService{
+		Pipe:  pipe,
+		Store: store,
+		Log:   logger,
+	}
 }
 
 func NewV1DnsGroupsRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
@@ -35,8 +39,8 @@ func NewV1DnsGroupRestService(pipe net.NetPipe, store registry.Store, logger log
 	}
 }
 
-func NewV1DnsRootRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
-	return &v1.DnsRootService{
+func NewV1DnsGroupResourcesRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+	return &v1.DnsGroupResourcesService{
 		Pipe:  pipe,
 		Store: store,
 		Log:   logger,

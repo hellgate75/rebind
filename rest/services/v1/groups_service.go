@@ -113,6 +113,21 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func writeGroupsErrorResponse(w http.ResponseWriter, r *http.Request, logger log.Logger, groupName string, requestType string, messageSuffix string, httpStatus int) {
+	w.WriteHeader(httpStatus)
+	response := model.Response{
+		Status:  httpStatus,
+		Message: fmt.Sprintf("Group %s request %s : %s", groupName, requestType, messageSuffix),
+		Data:    nil,
+	}
+	logger.Errorf("Group %s %s request : %s", groupName, requestType, messageSuffix)
+	err := utils.RestParseResponse(w, r, &response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Errorf("Error encoding group %s update query response, Error: %v", groupName, err)
+	}
+}
+
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupsService) Read(w http.ResponseWriter, r *http.Request) {
@@ -140,13 +155,13 @@ func (s *DnsGroupsService) Read(w http.ResponseWriter, r *http.Request) {
 	}
 	var list = make([]data.Group, 0)
 	for _, g := range groups {
-		if ( name == "" || name == g.Name ) &&
-			( domain == "" || utils.StringsListContainItem(domain, g.Domains, true) ) &&
-			( forwarder == "" || utils.UDPAddrListContainsValue(g.Forwarders, forwarder) ) {
+		if (name == "" || name == g.Name) &&
+			(domain == "" || utils.StringsListContainItem(domain, g.Domains, true)) &&
+			(forwarder == "" || utils.UDPAddrListContainsValue(g.Forwarders, forwarder)) {
 			list = append(list, g)
 		}
 	}
-	response := model.Response {
+	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
 		Data:    DnsGroupsResponse{Groups: list},
@@ -172,7 +187,7 @@ func (s *DnsGroupsService) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }
 
@@ -189,6 +204,6 @@ func (s *DnsGroupsService) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }

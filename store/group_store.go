@@ -14,18 +14,14 @@ import (
 	"time"
 )
 
-type RecordMeta struct {
-	Addr     net.IPAddr
+type DNSRecord struct {
+	NodeName string
+	Type     string
+	Addr     net.IP
 	Data     string
 	Resource dnsmessage.Resource
 	TTL      uint32
 	Created  time.Time
-}
-
-type DNSRecord struct {
-	NodeName  string
-	Type      string
-	Resources []RecordMeta
 }
 
 // This represent a single zone key store
@@ -45,6 +41,8 @@ type GroupStore interface {
 	GetDomains() []string
 	// Retrieve store name forwarders
 	GetForwarders() []net.UDPAddr
+	//Remove all records in the store
+	ClearData()
 }
 
 type GroupStorePersistent struct {
@@ -60,6 +58,10 @@ type GroupStoreData struct {
 	GroupName  string
 	Domains    []string
 	Forwarders []net.UDPAddr
+}
+
+func (b *GroupStoreData) ClearData() {
+	b.store = make(map[string][]DNSRecord)
 }
 
 func (b *GroupStoreData) PersistentData() GroupStorePersistent {

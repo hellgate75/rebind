@@ -31,7 +31,7 @@ func (s *DnsRootService) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }
 
@@ -52,7 +52,7 @@ func (s *DnsRootService) Read(w http.ResponseWriter, r *http.Request) {
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *DnsRootService) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }
 
@@ -82,6 +82,6 @@ func (s *DnsRootService) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
-		s.Log.Errorf("Error encording response: %v", err)
+		s.Log.Errorf("Error encoding response: %v", err)
 	}
 }

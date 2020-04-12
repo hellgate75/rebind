@@ -22,7 +22,7 @@ import (
 
 type Store interface {
 	Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, bool)
-	Set(hostname string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool
+	Set(hostname string, resource dnsmessage.Resource, addr net.IP, recordData string, old *dnsmessage.Resource) bool
 	Override(hostname string, resources []dnsmessage.Resource)
 	Remove(hostname string, r *dnsmessage.Resource) bool
 	Save()
@@ -97,9 +97,7 @@ func (s *_store) Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, boo
 			continue
 		}
 		for _, r := range recs {
-			for _, m := range r.Resources {
-				res = append(res, m.Resource)
-			}
+			res = append(res, r.Resource)
 		}
 	}
 	return res, fwd, ok
@@ -124,7 +122,7 @@ func (s *_store) GetGroupsFromHost(hostname string) ([]data.Group, error) {
 	return groups, nil
 }
 
-func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool {
+func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IP, recordData string, old *dnsmessage.Resource) bool {
 	ok := true
 	changed := false
 	s.Lock()
@@ -144,13 +142,6 @@ func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IPA
 	}
 
 	var fwd = make([]net.UDPAddr, 0)
-	storeMeta := store.RecordMeta{
-		Resource: resource,
-		TTL:      resource.Header.TTL,
-		Created:  time.Now(),
-		Data:     recordData,
-		Addr:     addr,
-	}
 	var groups = make(map[string]data.Group, 0)
 	for _, domain := range domains {
 		gr, err := s.store.GetGroupsByDomain(domain)
@@ -176,15 +167,23 @@ func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IPA
 		recs, errR := sg.Get(hostname)
 		if errR != nil || len(recs) == 0 {
 			sg.Set(hostname, store.DNSRecord{
-				Resources: []store.RecordMeta{storeMeta},
-				Type:      resource.Header.Type.String(),
-				NodeName:  hostname,
+				Resource: resource,
+				TTL:      resource.Header.TTL,
+				Created:  time.Now(),
+				Data:     recordData,
+				Addr:     addr,
+				Type:     resource.Header.Type.String(),
+				NodeName: hostname,
 			})
 		} else {
 			sg.Set(hostname, store.DNSRecord{
-				Resources: []store.RecordMeta{storeMeta},
-				Type:      resource.Header.Type.String(),
-				NodeName:  hostname,
+				Resource: resource,
+				TTL:      resource.Header.TTL,
+				Created:  time.Now(),
+				Data:     recordData,
+				Addr:     addr,
+				Type:     resource.Header.Type.String(),
+				NodeName: hostname,
 			})
 		}
 		g, err = s.store.SaveGroup(sg, g)
@@ -214,19 +213,15 @@ func (s *_store) Override(hostname string, resources []dnsmessage.Resource) {
 	}
 	var dnsRecords = make([]store.DNSRecord, 0)
 	for _, resource := range resources {
-		var addr *net.IPAddr = nil
+		var addr net.IP = nil
 		rec := store.DNSRecord{
 			NodeName: hostname,
 			Type:     resource.Header.Type.String(),
-			Resources: []store.RecordMeta{
-				{
-					Resource: resource,
-					TTL:      resource.Header.TTL,
-					Created:  time.Now(),
-					Data:     resource.Body.GoString(),
-					Addr:     *addr,
-				},
-			},
+			Resource: resource,
+			TTL:      resource.Header.TTL,
+			Created:  time.Now(),
+			Data:     resource.Body.GoString(),
+			Addr:     addr,
 		}
 
 		dnsRecords = append(dnsRecords, rec)

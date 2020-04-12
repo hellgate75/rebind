@@ -22,6 +22,10 @@ type GroupsBucket struct {
 	Groups     map[string]Group `yaml:"groups" json:"groups" xml:"groups"`
 }
 
+type groupBucketPersitence struct {
+	Groups map[string]Group `yaml:"groups" json:"groups" xml:"groups"`
+}
+
 func NewGroupsBucket(folder string, log log.Logger) GroupsBucket {
 	return GroupsBucket{
 		Folder: folder,

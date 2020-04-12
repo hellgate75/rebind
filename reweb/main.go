@@ -12,7 +12,7 @@ import (
 	"github.com/hellgate75/rebind/model"
 	pnet "github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
-	"github.com/hellgate75/rebind/reweb/rest"
+	"github.com/hellgate75/rebind/rest/services"
 	"github.com/hellgate75/rebind/utils"
 	"net"
 	"net/http"
@@ -24,13 +24,9 @@ var listenIP string
 var listenPort int
 var dnsPipeIP string
 var dnsPipePort int
+var dnsPipeResponsePort int
 var tlsCert string
 var tlsKey string
-
-const (
-	internalListenPort int = 954
-	internalDialPort   int = 953
-)
 
 //TODO: Give Life to Logger
 var logger log.Logger = log.NewLogger("re-web", log.INFO)
@@ -44,6 +40,7 @@ func init() {
 	flag.IntVar(&listenPort, "listen-port", model.DefaultRestServerPort, "http server port")
 	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", model.DefaultDnsPipeAddress, "tcp dns pipe ip")
 	flag.IntVar(&dnsPipePort, "dns-pipe-port", model.DefaultDnsPipePort, "tcp dns pipe port")
+	flag.IntVar(&dnsPipeResponsePort, "dns-pipe-response-port", model.DefaultDnsPipePort, "tcp dns pipe responses port")
 	flag.StringVar(&tlsCert, "tsl-cert", "", "tls certificate file path")
 	flag.StringVar(&tlsKey, "tsl-key", "", "tls certificate key file path")
 }
@@ -60,18 +57,21 @@ func main() {
 		logger.Errorf("Create rwdirpath: %v error: %v", rwDirPath, err)
 		return
 	}
+
+	// Improve list of default group forwarders if provided
 	defaultForwarders = append(defaultForwarders, model.DefaultGroupForwarders...)
-	pipe, err := pnet.NewInputOutputPipe(internalListenPort, internalDialPort, nil, logger)
+
+	// Create network Pipe Stream with the dns server
+	pipe, err := pnet.NewInputOutputPipeWith(dnsPipeIP, dnsPipePort, dnsPipeIP, dnsPipeResponsePort, nil, logger)
 	if err != nil {
-		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v\n", internalListenPort, internalDialPort)
+		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v/%v\n", dnsPipePort, dnsPipeResponsePort)
 	}
+	// Create Data Store
 	store := registry.NewStore(logger, rwDirPath, defaultForwarders)
 	store.Load()
-	v1GroupsRest := rest.NewV1DnsGroupsRestService(pipe, store, logger)
-	v1GroupRest := rest.NewV1DnsGroupRestService(pipe, store, logger)
-	v1DnsRootRest := rest.NewV1DnsRootRestService(pipe, store, logger)
 
-	dnsHandler := func(serv rest.RestService) http.HandlerFunc {
+	// Handler stuf for the API service groups
+	dnsHandler := func(serv services.RestService) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {
 			case http.MethodPost:
@@ -95,14 +95,14 @@ func main() {
 	}
 
 	rtr := mux.NewRouter()
-	//Adding entry point for generic queries (GET)
-	rtr.HandleFunc("/v1/dns", withAuth(dnsHandler(v1DnsRootRest))).Methods("GET", "POST")
-	//Adding entry point for zones queries (PUT, POST, DEL, GET)
-	rtr.HandleFunc("/v1/dns/groups", withAuth(dnsHandler(v1GroupsRest))).Methods("GET", "POST")
-	//Adding entry point for spcific zone queries (PUT, POST, DEL, GET)
-	rtr.HandleFunc("/v1/dns/group/{name:[a-zA-Z0-9]+}", withAuth(dnsHandler(v1GroupRest))).Methods("GET", "PUT", "DELETE")
 
+	// Creates/Sets API endpoints handlers
+	services.CreateApiEndpoints(rtr, withAuth, dnsHandler, pipe, store, logger)
+
+	//Adding entry point for generic queries (GET)
 	http.Handle("/", rtr)
+
+	// Adding TLS certificates if required
 	if tlsCert == "" || tlsKey == "" {
 		logger.Infof("RestService start-up:: Starting server in simple mode on ip: %s and port: %v\n", listenIP, listenPort)
 		err = http.ListenAndServe(fmt.Sprintf("%s:%v", listenIP, listenPort), nil)

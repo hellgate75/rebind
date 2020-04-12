@@ -220,7 +220,7 @@ func Start(rwDirPath string, ip string, port int, pipeIP string, pipePort int, l
 }
 
 func (s *dnsService) Save(key string, resource dnsmessage.Resource, addr net.IPAddr, recordData string, old *dnsmessage.Resource) bool {
-	ok := s.Store.Set(key, resource, addr, recordData, old)
+	ok := s.Store.Set(key, resource, addr.IP, recordData, old)
 	go s.Store.Save()
 	return ok
 }
