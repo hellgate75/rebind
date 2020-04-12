@@ -73,7 +73,6 @@ func main() {
 
 	dnsHandler := func(serv rest.RestService) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			//TODO: Filter Method by request path: r.RequestURI
 			switch r.Method {
 			case http.MethodPost:
 				serv.Create(w, r)
@@ -101,7 +100,7 @@ func main() {
 	//Adding entry point for zones queries (PUT, POST, DEL, GET)
 	rtr.HandleFunc("/v1/dns/groups", withAuth(dnsHandler(v1GroupsRest))).Methods("GET", "POST")
 	//Adding entry point for spcific zone queries (PUT, POST, DEL, GET)
-	rtr.HandleFunc("/v1/dns/group/{name:[a-zA-Z0-9]+}/profile", withAuth(dnsHandler(v1GroupRest))).Methods("GET", "POST", "PUT", "DELETE")
+	rtr.HandleFunc("/v1/dns/group/{name:[a-zA-Z0-9]+}", withAuth(dnsHandler(v1GroupRest))).Methods("GET", "PUT", "DELETE")
 
 	http.Handle("/", rtr)
 	if tlsCert == "" || tlsKey == "" {

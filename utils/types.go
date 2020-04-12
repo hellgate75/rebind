@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,53 @@ var (
 	ErrTypeNotSupport = errors.New("type not support")
 	ErrIPInvalid      = errors.New("invalid IP address")
 )
+
+func getInteger(v string) (int, bool) {
+	if n, err := strconv.Atoi(v); err == nil {
+		return n, true
+	}
+	return 0, false
+}
+
+func UDPAddrListContainsValue(list []net.UDPAddr, value string) bool {
+	if len(list) == 0 {
+		return false
+	}
+	if n, b := getInteger(value); b {
+		for _, addr := range list {
+			if addr.Port == n {
+				return true
+			}
+		}
+	} else {
+		for _, addr := range list {
+			if addr.IP.String() == value ||
+				addr.Zone == value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func FilterUDPAddrListByValue(list []net.UDPAddr, value string) []net.UDPAddr {
+	var out = make([]net.UDPAddr, 0)
+	if n, b := getInteger(value); b {
+		for _, addr := range list {
+			if addr.Port == n {
+				out = append(out, addr)
+			}
+		}
+	} else {
+		for _, addr := range list {
+			if addr.IP.String() == value ||
+				addr.Zone == value {
+				out = append(out, addr)
+			}
+		}
+	}
+	return out
+}
 
 func StringsListContainItem(elem string, elems []string, ignoreCase bool) bool {
 	if ignoreCase {

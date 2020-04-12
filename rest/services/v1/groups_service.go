@@ -103,7 +103,7 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data:    DnsGroupsResponse{Groups: []data.Group{*group}},
+		Data:    DnsGroupsResponse{Groups: []data.Group{group}},
 	}
 	w.WriteHeader(http.StatusCreated)
 	err = utils.RestParseResponse(w, r, &response)
@@ -116,13 +116,37 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupsService) Read(w http.ResponseWriter, r *http.Request) {
-	s.Store.Load()
 	groups := s.Store.GetGroupBucket().ListGroups()
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		name = r.Header.Get("Name")
+	}
+	if name == "" {
+		name = r.Header.Get("name")
+	}
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		domain = r.Header.Get("Domain")
+	}
+	if domain == "" {
+		domain = r.Header.Get("domain")
+	}
+	forwarder := r.URL.Query().Get("forwarder")
+	if forwarder == "" {
+		forwarder = r.Header.Get("Forwarder")
+	}
+	if forwarder == "" {
+		forwarder = r.Header.Get("forwarder")
+	}
 	var list = make([]data.Group, 0)
 	for _, g := range groups {
-		list = append(list, *g)
+		if ( name == "" || name == g.Name ) &&
+			( domain == "" || utils.StringsListContainItem(domain, g.Domains, true) ) &&
+			( forwarder == "" || utils.UDPAddrListContainsValue(g.Forwarders, forwarder) ) {
+			list = append(list, g)
+		}
 	}
-	response := model.Response{
+	response := model.Response {
 		Status:  http.StatusOK,
 		Message: "OK",
 		Data:    DnsGroupsResponse{Groups: list},

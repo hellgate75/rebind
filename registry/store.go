@@ -27,7 +27,7 @@ type Store interface {
 	Remove(hostname string, r *dnsmessage.Resource) bool
 	Save()
 	Load()
-	Clone() map[string]store.GroupStore
+	Clone() map[string]store.GroupStoreData
 	GetGroupBucket() *data.GroupsBucket
 }
 
@@ -72,7 +72,7 @@ func (s *_store) Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, boo
 	var res = make([]dnsmessage.Resource, 0)
 	var fwd = make([]net.UDPAddr, 0)
 
-	var groups = make(map[string]*data.Group, 0)
+	var groups = make(map[string]data.Group, 0)
 	for _, domain := range domains {
 		gr, err := s.store.GetGroupsByDomain(domain)
 		if err == nil || len(gr) == 0 {
@@ -105,14 +105,14 @@ func (s *_store) Get(hostname string) ([]dnsmessage.Resource, []net.UDPAddr, boo
 	return res, fwd, ok
 }
 
-func (s *_store) GetGroupsFromHost(hostname string) ([]*data.Group, error) {
+func (s *_store) GetGroupsFromHost(hostname string) ([]data.Group, error) {
 	return nil, nil
 	server := strings.Split(hostname, ".")[0]
 	domains := utils.SplitDomainsFromHostname(hostname)
 	if len(domains) == 1 && (domains[0] == "" || utils.IsDefaultGroupDomain(domains[0])) {
 		hostname = server
 	}
-	var groups = make([]*data.Group, 0)
+	var groups = make([]data.Group, 0)
 	for _, domain := range domains {
 		gr, err := s.store.GetGroupsByDomain(domain)
 		if err == nil || len(gr) == 0 {
@@ -151,7 +151,7 @@ func (s *_store) Set(hostname string, resource dnsmessage.Resource, addr net.IPA
 		Data:     recordData,
 		Addr:     addr,
 	}
-	var groups = make(map[string]*data.Group, 0)
+	var groups = make(map[string]data.Group, 0)
 	for _, domain := range domains {
 		gr, err := s.store.GetGroupsByDomain(domain)
 		if err == nil || len(gr) == 0 {
@@ -237,7 +237,7 @@ func (s *_store) Override(hostname string, resources []dnsmessage.Resource) {
 		hostname = server
 	}
 
-	var groups = make([]*data.Group, 0)
+	var groups = make([]data.Group, 0)
 	for _, domain := range domains {
 		gr, err := s.store.GetGroupsByDomain(domain)
 		if err == nil || len(gr) == 0 {
@@ -314,7 +314,7 @@ func (s *_store) Load() {
 	}
 }
 
-func (s *_store) Clone() map[string]store.GroupStore {
+func (s *_store) Clone() map[string]store.GroupStoreData {
 	defer func() {
 		if r := recover(); r != nil {
 			if s.log != nil {
@@ -323,7 +323,7 @@ func (s *_store) Clone() map[string]store.GroupStore {
 		}
 		s.RUnlock()
 	}()
-	cp := make(map[string]store.GroupStore)
+	cp := make(map[string]store.GroupStoreData)
 	s.RLock()
 	for _, key := range s.store.Keys() {
 		group, err := s.store.GetGroupByName(s.store.ConvertToGroupLikeKey(key))

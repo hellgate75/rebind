@@ -115,10 +115,10 @@ func (i *GroupsBucket) Keys() []string {
 	return out
 }
 func (i *GroupsBucket) CreateAndPersistGroupAndStore(key string, domains []string,
-	forwarders []net.UDPAddr) (*Group, store.GroupStore, error) {
+	forwarders []net.UDPAddr) (Group, store.GroupStoreData, error) {
 	groupRef := i.CreateUnboundGroup(key, domains, forwarders)
 	groupStore := store.NewGroupStore(groupRef.Name, domains, forwarders)
-	var gsd *store.GroupStoreData = groupStore.(*store.GroupStoreData)
+	var gsd  = *(groupStore.(*store.GroupStoreData))
 	groupRef, err := i.SaveGroup(gsd, groupRef)
 	if err != nil {
 		if i.log != nil {
@@ -126,9 +126,9 @@ func (i *GroupsBucket) CreateAndPersistGroupAndStore(key string, domains []strin
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error creating and persisting store: %s, Error: %v", key, err)
 		}
-		return nil, nil, err
+		return Group{}, store.GroupStoreData{}, err
 	}
-	i.Groups[groupRef.Name] = *groupRef
+	i.Groups[groupRef.Name] = groupRef
 	err = i.SaveMeta()
 	if err != nil {
 		if i.log != nil {
@@ -136,10 +136,10 @@ func (i *GroupsBucket) CreateAndPersistGroupAndStore(key string, domains []strin
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error creating and persisting group: %s, Error: %v", key, err)
 		}
-		return nil, nil, err
+		return Group{}, store.GroupStoreData{}, err
 	}
 	return groupRef,
-		groupStore,
+		gsd,
 		err
 }
 
@@ -187,9 +187,9 @@ func (i *GroupsBucket) ConvertToGroupLikeKey(key string) string {
 	return utils.ConvertKeyToId(key)
 }
 func (i *GroupsBucket) CreateUnboundGroup(key string, domains []string,
-	forwarders []net.UDPAddr) *Group {
+	forwarders []net.UDPAddr) Group {
 	def := utils.ConvertKeyToId(key)
-	return &Group{
+	return Group{
 		Name:       def,
 		Domains:    domains,
 		Forwarders: forwarders,
@@ -198,29 +198,45 @@ func (i *GroupsBucket) CreateUnboundGroup(key string, domains []string,
 	}
 }
 
-func (i *GroupsBucket) GetGroupById(id string) (*Group, error) {
-	if group, ok := i.Groups[id]; ok {
-		return &group, nil
-	}
-	return nil, errors.New(fmt.Sprintf("Unable to find group by id: %s", id))
-}
-
-func (i *GroupsBucket) GetGroupByName(name string) (*Group, error) {
-	for _, group := range i.Groups {
-		if group.Name == name {
-			return &group, nil
+func (i *GroupsBucket) Delete(groupName string) bool {
+	if g, ok := i.Groups[groupName]; ok {
+		fileName := fmt.Sprintf("%s%s%s", i.Folder, __sepPath, g.File)
+		err := os.Remove(fileName)
+		if err != nil {
+			return false
+		}
+		delete(i.Groups, groupName)
+		err = i.SaveMeta()
+		if err != nil {
+			return false
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("Unable to find group by name: %s", name))
+	return true
 }
 
-func (i *GroupsBucket) GetGroupsByDomain(domain string) ([]*Group, error) {
-	var out []*Group = make([]*Group, 0)
+func (i *GroupsBucket) GetGroupById(id string) (Group, error) {
+	if group, ok := i.Groups[id]; ok {
+		return group, nil
+	}
+	return Group{}, errors.New(fmt.Sprintf("Unable to find group by id: %s", id))
+}
+
+func (i *GroupsBucket) GetGroupByName(name string) (Group, error) {
+	for _, group := range i.Groups {
+		if group.Name == name {
+			return group, nil
+		}
+	}
+	return Group{}, errors.New(fmt.Sprintf("Unable to find group by name: %s", name))
+}
+
+func (i *GroupsBucket) GetGroupsByDomain(domain string) ([]Group, error) {
+	var out = make([]Group, 0)
 	isDefault := utils.IsDefaultGroupDomain(domain)
 	for _, group := range i.Groups {
 		if (isDefault && group.Name == utils.DEFAULT_GROUP_NAME) ||
 			utils.StringsListContainItem(domain, group.Domains, false) {
-			out = append(out, &group)
+			out = append(out, group)
 		}
 	}
 	if len(out) > 0 {
@@ -229,14 +245,16 @@ func (i *GroupsBucket) GetGroupsByDomain(domain string) ([]*Group, error) {
 	return out, errors.New(fmt.Sprintf("Unable to find group by domain: %s", domain))
 }
 
-var cache = make(map[*Group]*store.GroupStoreData)
+type GroupBlock struct {
+	Group	Group
+	Data	store.GroupStoreData
+}
 
-func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error) {
-	if group == nil {
-		return nil, errors.New("Unable to load groupStore by nil group ...")
-	}
-	if gs, ok := cache[group]; ok {
-		return gs, nil
+var cache = make(map[string]GroupBlock)
+
+func (i *GroupsBucket) GetGroupStore(group Group) (store.GroupStoreData, error) {
+	if gs, ok := cache[group.Name]; ok {
+		return gs.Data, nil
 	}
 	var err error
 	defer func() {
@@ -260,7 +278,7 @@ func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] %s", message)
 		}
-		return nil, errors.New(message)
+		return store.GroupStoreData{}, errors.New(message)
 	}
 	f, cErr := os.OpenFile(fileName, os.O_RDONLY, 0666)
 	if cErr != nil {
@@ -269,7 +287,7 @@ func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error reading group groupStore file at: %s, Error: %v", fileName, cErr)
 		}
-		return nil, cErr
+		return store.GroupStoreData{}, cErr
 	}
 	defer f.Close()
 	groupStore := store.GroupStoreData{}
@@ -282,16 +300,19 @@ func (i *GroupsBucket) GetGroupStore(group *Group) (*store.GroupStoreData, error
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error loading group groupStore file at: %s, Error: %v", fileName, err)
 		}
-		return nil, err
+		return store.GroupStoreData{}, err
 	}
 	groupStore.Forwarders = group.Forwarders
 	groupStore.Domains = group.Domains
 	groupStore.GroupName = group.Name
-	cache[group] = &groupStore
-	return &groupStore, err
+	cache[group.Name] = GroupBlock{
+		Group: group,
+		Data: groupStore,
+	}
+	return groupStore, err
 }
 
-func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
+func (i *GroupsBucket) SaveGroups(groupsStore store.GroupsStoreData) error {
 	keys := groupsStore.Keys()
 	for _, key := range keys {
 		def := utils.ConvertKeyToId(key)
@@ -328,7 +349,7 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 				}
 				return err.Error()
 			}
-			group, sErr := i.SaveGroup(zStore.(*store.GroupStoreData), &groupCfg)
+			group, sErr := i.SaveGroup(*(zStore.(*store.GroupStoreData)), groupCfg)
 			if sErr != nil {
 				if i.log != nil {
 					i.log.Errorf("GroupsBucket:: [ERROR] Error saving group groupsStore for key: %s, Error: %v", key, err.Error())
@@ -337,7 +358,7 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 				}
 				return err.Error()
 			}
-			i.Groups[def] = *group
+			i.Groups[def] = group
 		} else {
 			if i.log != nil {
 				i.log.Errorf("GroupsBucket:: [WARN ] Unable to find config for group: %s", key)
@@ -349,30 +370,30 @@ func (i *GroupsBucket) SaveGroups(groupsStore *store.GroupsStoreData) error {
 	return i.SaveMeta()
 }
 
-func (i *GroupsBucket) UpdateExistingGroup(group *Group) bool {
+func (i *GroupsBucket) UpdateExistingGroup(group Group) bool {
 	if _, ok := i.Groups[group.Name]; ok {
-		i.Groups[group.Name] = *group
+		i.Groups[group.Name] = group
 		return true
 	}
 	return false
 }
 
-func (i *GroupsBucket) ListGroups() []*Group {
-	var out = make([]*Group, 0)
+func (i *GroupsBucket) ListGroups() []Group {
+	var out = make([]Group, 0)
 	for _, g := range i.Groups {
-		out = append(out, &g)
+		out = append(out, g)
 	}
 	return out
 }
 
-func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group) (*Group, error) {
+func (i *GroupsBucket) SaveGroup(groupStore store.GroupStoreData, group Group) (Group, error) {
 	var err error
-	if group == nil {
-		return nil, errors.New("Unable to save nil group ...")
-	}
-	if groupStore == nil {
-		return nil, errors.New("Unable to save nil group store ...")
-	}
+	//if group == nil {
+	//	return nil, errors.New("Unable to save nil group ...")
+	//}
+	//if groupStore == nil {
+	//	return nil, errors.New("Unable to save nil group store ...")
+	//}
 	defer func() {
 		if r := recover(); r != nil {
 			message := fmt.Sprintf("Runtime Error saving groups store file, Error: %v", r)
@@ -397,7 +418,7 @@ func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group)
 			} else {
 				fmt.Sprintf("GroupsBucket:: [ERROR] Error saving removing old group file at: %s, Error: %v", fileName, rErr)
 			}
-			return nil, rErr
+			return Group{}, rErr
 		}
 	}
 	f, err := os.OpenFile(fileName, os.O_RDWR+os.O_CREATE, 0666)
@@ -407,10 +428,10 @@ func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group)
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error creating new group file at: %s, Error: %v", fileName, err)
 		}
-		return nil, err
+		return Group{}, err
 	}
 	defer f.Close()
-	var save store.GroupStorePersistent = groupStore.PersistentData()
+	var save = groupStore.PersistentData()
 	err = gob.NewEncoder(f).Encode(&save)
 	if err != nil {
 		if i.log != nil {
@@ -418,8 +439,11 @@ func (i *GroupsBucket) SaveGroup(groupStore *store.GroupStoreData, group *Group)
 		} else {
 			fmt.Sprintf("GroupsBucket:: [ERROR] Error saving new group file at: %s, Error: %v", fileName, err)
 		}
-		return nil, err
+		return Group{}, err
 	}
-	cache[group] = groupStore
+	cache[group.Name] = GroupBlock{
+		Group: group,
+		Data: groupStore,
+	}
 	return group, err
 }
