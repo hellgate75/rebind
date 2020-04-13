@@ -95,9 +95,13 @@ func main() {
 	}
 
 	rtr := mux.NewRouter()
-
+	var proto string = "http"
+	if tlsCert != "" && tlsKey != "" {
+		proto = "https"
+	}
 	// Creates/Sets API endpoints handlers
-	services.CreateApiEndpoints(rtr, withAuth, dnsHandler, pipe, store, logger)
+	services.CreateApiEndpoints(rtr, withAuth, dnsHandler,
+		pipe, store, logger, fmt.Sprintf("%s://%s:%v", proto, listenIP, listenPort))
 
 	//Adding entry point for generic queries (GET)
 	http.Handle("/", rtr)

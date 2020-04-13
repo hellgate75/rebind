@@ -15,34 +15,47 @@ type RestService interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 }
 
-func NewV1DnsRootRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+func NewV1DnsRootRestService(pipe net.NetPipe, store registry.Store, logger log.Logger, hostBaseUrl string) RestService {
 	return &v1.DnsRootService{
-		Pipe:  pipe,
-		Store: store,
-		Log:   logger,
+		Pipe:    pipe,
+		Store:   store,
+		Log:     logger,
+		BaseUrl: hostBaseUrl,
 	}
 }
 
-func NewV1DnsGroupsRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+func NewV1DnsGroupsRestService(pipe net.NetPipe, store registry.Store, logger log.Logger, hostBaseUrl string) RestService {
 	return &v1.DnsGroupsService{
-		Pipe:  pipe,
-		Store: store,
-		Log:   logger,
+		Pipe:    pipe,
+		Store:   store,
+		Log:     logger,
+		BaseUrl: hostBaseUrl,
 	}
 }
 
-func NewV1DnsGroupRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+func NewV1DnsGroupRestService(pipe net.NetPipe, store registry.Store, logger log.Logger, hostBaseUrl string) RestService {
 	return &v1.DnsGroupService{
-		Pipe:  pipe,
-		Store: store,
-		Log:   logger,
+		Pipe:    pipe,
+		Store:   store,
+		Log:     logger,
+		BaseUrl: hostBaseUrl,
 	}
 }
 
-func NewV1DnsGroupResourcesRestService(pipe net.NetPipe, store registry.Store, logger log.Logger) RestService {
+func NewV1DnsGroupResourcesRestService(pipe net.NetPipe, store registry.Store, logger log.Logger, hostBaseUrl string) RestService {
 	return &v1.DnsGroupResourcesService{
-		Pipe:  pipe,
-		Store: store,
-		Log:   logger,
+		Pipe:    pipe,
+		Store:   store,
+		Log:     logger,
+		BaseUrl: hostBaseUrl,
+	}
+}
+
+func NewV1DnsGroupResourceDetailsRestService(pipe net.NetPipe, store registry.Store, logger log.Logger, hostBaseUrl string) RestService {
+	return &v1.DnsGroupResourceDetailsService{
+		Pipe:    pipe,
+		Store:   store,
+		Log:     logger,
+		BaseUrl: hostBaseUrl,
 	}
 }

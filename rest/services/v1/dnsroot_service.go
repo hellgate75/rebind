@@ -15,9 +15,10 @@ type DnsRootResponse struct {
 
 // DnsRootService is an implementation of RestService interface.
 type DnsRootService struct {
-	Pipe  net.NetPipe
-	Store registry.Store
-	Log   log.Logger
+	Pipe    net.NetPipe
+	Store   registry.Store
+	Log     log.Logger
+	BaseUrl string
 }
 
 // Create is HTTP handler of POST model.Request.

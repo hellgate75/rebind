@@ -17,9 +17,10 @@ import (
 
 // DnsGroupService is an implementation of RestService interface.
 type DnsGroupService struct {
-	Pipe  net.NetPipe
-	Store registry.Store
-	Log   log.Logger
+	Pipe    net.NetPipe
+	Store   registry.Store
+	Log     log.Logger
+	BaseUrl string
 }
 
 type Action string

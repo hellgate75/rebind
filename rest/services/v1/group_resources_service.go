@@ -17,9 +17,10 @@ import (
 
 // DnsGroupResourcesService is an implementation of RestService interface.
 type DnsGroupResourcesService struct {
-	Pipe  net.NetPipe
-	Store registry.Store
-	Log   log.Logger
+	Pipe    net.NetPipe
+	Store   registry.Store
+	Log     log.Logger
+	BaseUrl string
 }
 
 type DnsGroupResourceType struct {
@@ -30,7 +31,7 @@ type DnsGroupResourceType struct {
 	Record  string  `yaml:"record,omitempty" json:"record,omitempty" xml:"record,omitempty"`
 }
 
-type DnsGroupResourcesBucker struct {
+type DnsGroupResourcesBucket struct {
 	Resources []DnsGroupResourceType `yaml:"resources" json:"resources" xml:"resources"`
 }
 
@@ -89,10 +90,17 @@ func (s *DnsGroupResourcesService) Create(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var resourceAnswer = DnsGroupResourceType{
+		Type:    typeS,
+		Addr:    ipAddr,
+		Name:    host,
+		RecData: recData,
+		Record:  resource.Body.GoString(),
+	}
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data:    DnsGroupsResponse{Groups: []data.Group{group}},
+		Data:    DnsGroupResourcesBucket{Resources: []DnsGroupResourceType{resourceAnswer}},
 	}
 	w.WriteHeader(http.StatusCreated)
 	err = utils.RestParseResponse(w, r, &response)
@@ -142,7 +150,7 @@ func (s *DnsGroupResourcesService) Read(w http.ResponseWriter, r *http.Request) 
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data: DnsGroupResourcesBucker{
+		Data: DnsGroupResourcesBucket{
 			Resources: resources,
 		},
 	}
