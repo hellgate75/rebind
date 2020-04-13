@@ -5,6 +5,7 @@ import (
 	"github.com/hellgate75/rebind/data"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/model"
+	"github.com/hellgate75/rebind/model/rest"
 	"github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/store"
@@ -113,6 +114,42 @@ func (s *DnsGroupResourcesService) Create(w http.ResponseWriter, r *http.Request
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupResourcesService) Read(w http.ResponseWriter, r *http.Request) {
+	var action = r.URL.Query().Get("action")
+	if strings.ToLower(action) == "template" {
+		var templates = make([]rest.DnsTemplateDataType, 0)
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "POST",
+			Header:  []string{},
+			Query:   []string{},
+			Request: model.Request{},
+		})
+		//templates = append(templates, rest.DnsTemplateDataType{
+		//	Method: "PUT",
+		//	Header: []string{},
+		//	Query: []string{},
+		//	Request: model.Request{},
+		//})
+		//templates = append(templates, rest.DnsTemplateDataType{
+		//	Method: "DELETE",
+		//	Header: []string{},
+		//	Query: []string{},
+		//	Request: nil,
+		//})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "GET",
+			Header:  []string{},
+			Query:   []string{"action=template"},
+			Request: nil,
+		})
+		tErr := utils.RestParseResponse(w, r, &rest.DnsTemplateResponse{
+			Templates: templates,
+		})
+		if tErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			s.Log.Errorf("Error encoding template(s) summary response, Error: %v", tErr)
+		}
+		return
+	}
 	groupName := getParentGroup(r)
 	group, err := s.Store.GetGroupBucket().GetGroupById(groupName)
 	if err != nil {
@@ -169,7 +206,7 @@ func (s *DnsGroupResourcesService) Update(w http.ResponseWriter, r *http.Request
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: fmt.Sprintf("Not allowed on dns group %s resources", groupName),
-		Data: DnsGroupsResponse{
+		Data: rest.DnsGroupsResponse{
 			Groups: []data.Group{},
 		},
 	}
@@ -202,7 +239,7 @@ func (s *DnsGroupResourcesService) Delete(w http.ResponseWriter, r *http.Request
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: fmt.Sprintf("Not allowed on dns group %s resources", groupName),
-		Data: DnsGroupsResponse{
+		Data: rest.DnsGroupsResponse{
 			Groups: []data.Group{},
 		},
 	}

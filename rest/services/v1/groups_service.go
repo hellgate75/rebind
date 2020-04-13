@@ -5,11 +5,13 @@ import (
 	"github.com/hellgate75/rebind/data"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/model"
+	"github.com/hellgate75/rebind/model/rest"
 	"github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/utils"
 	net2 "net"
 	"net/http"
+	"strings"
 )
 
 // DnsGroupsService is an implementation of RestService interface.
@@ -20,21 +22,17 @@ type DnsGroupsService struct {
 	BaseUrl string
 }
 
-type DnsGroupsResponse struct {
-	Groups []data.Group `yaml:"groups,omitempty" json:"groups,omitempty" xml:"groups,omitempty"`
-}
-
 // Create is HTTP handler of POST model.Request.
 // Use for adding new record to DNS server.
 func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
-	var req model.GroupRequest
+	var req rest.GroupRequest
 	err := utils.RestParseRequest(w, r, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		response := model.Response{
 			Status:  http.StatusBadRequest,
 			Message: fmt.Sprintf("Error: %v", err),
-			Data:    DnsGroupsResponse{Groups: []data.Group{}},
+			Data:    rest.DnsGroupsResponse{Groups: []data.Group{}},
 		}
 		s.Log.Errorf("Error decoding groups request, Error: %v", err)
 		err := utils.RestParseResponse(w, r, &response)
@@ -50,7 +48,7 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 		response := model.Response{
 			Status:  http.StatusBadRequest,
 			Message: fmt.Sprintf("Group: %s has invalid or missing name / domains, please use proper api", req.Name),
-			Data:    DnsGroupsResponse{Groups: []data.Group{}},
+			Data:    rest.DnsGroupsResponse{Groups: []data.Group{}},
 		}
 		s.Log.Errorf("Error: Group: %s has invalid or missing name / domains, please use proper api", req.Name)
 		err := utils.RestParseResponse(w, r, &response)
@@ -65,7 +63,7 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 		response := model.Response{
 			Status:  http.StatusConflict,
 			Message: fmt.Sprintf("Group: %s already exists, please modify with proper api", req.Name),
-			Data:    DnsGroupsResponse{Groups: []data.Group{}},
+			Data:    rest.DnsGroupsResponse{Groups: []data.Group{}},
 		}
 		s.Log.Errorf("Error: Group: %s already exists, please modify with proper api", req.Name)
 		err := utils.RestParseResponse(w, r, &response)
@@ -90,7 +88,7 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 		response := model.Response{
 			Status:  http.StatusLocked,
 			Message: fmt.Sprintf("Error: %v", err),
-			Data:    DnsGroupsResponse{Groups: []data.Group{}},
+			Data:    rest.DnsGroupsResponse{Groups: []data.Group{}},
 		}
 		s.Log.Errorf("Error creating new group, Error: %v", err)
 		err := utils.RestParseResponse(w, r, &response)
@@ -104,7 +102,7 @@ func (s *DnsGroupsService) Create(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data:    DnsGroupsResponse{Groups: []data.Group{group}},
+		Data:    rest.DnsGroupsResponse{Groups: []data.Group{group}},
 	}
 	w.WriteHeader(http.StatusCreated)
 	err = utils.RestParseResponse(w, r, &response)
@@ -132,6 +130,42 @@ func writeGroupsErrorResponse(w http.ResponseWriter, r *http.Request, logger log
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupsService) Read(w http.ResponseWriter, r *http.Request) {
+	var action = r.URL.Query().Get("action")
+	if strings.ToLower(action) == "template" {
+		var templates = make([]rest.DnsTemplateDataType, 0)
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "POST",
+			Header:  []string{},
+			Query:   []string{},
+			Request: rest.GroupRequest{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "PUT",
+			Header:  []string{},
+			Query:   []string{},
+			Request: model.Request{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "DELETE",
+			Header:  []string{},
+			Query:   []string{},
+			Request: nil,
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "GET",
+			Header:  []string{"Name: default", "Domain: my-dcomain.com", "Forwarder: 8.8.8.8", "Forwarder: 53"},
+			Query:   []string{"action=template", "name=default", "domain=my-dcomain.com", "forwarder=8.8.8.8", "forwarder=53"},
+			Request: nil,
+		})
+		tErr := utils.RestParseResponse(w, r, &rest.DnsTemplateResponse{
+			Templates: templates,
+		})
+		if tErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			s.Log.Errorf("Error encoding template(s) summary response, Error: %v", tErr)
+		}
+		return
+	}
 	groups := s.Store.GetGroupBucket().ListGroups()
 	name := r.URL.Query().Get("name")
 	if name == "" {
@@ -165,7 +199,7 @@ func (s *DnsGroupsService) Read(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data:    DnsGroupsResponse{Groups: list},
+		Data:    rest.DnsGroupsResponse{Groups: list},
 	}
 	w.WriteHeader(http.StatusOK)
 	err := utils.RestParseResponse(w, r, &response)
@@ -182,7 +216,7 @@ func (s *DnsGroupsService) Update(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: "Not allowed on dns groups",
-		Data: DnsGroupsResponse{
+		Data: rest.DnsGroupsResponse{
 			Groups: []data.Group{},
 		},
 	}
@@ -199,7 +233,7 @@ func (s *DnsGroupsService) Delete(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: "Not allowed on dns groups",
-		Data: DnsGroupsResponse{
+		Data: rest.DnsGroupsResponse{
 			Groups: []data.Group{},
 		},
 	}

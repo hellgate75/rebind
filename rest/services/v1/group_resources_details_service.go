@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/model"
+	"github.com/hellgate75/rebind/model/rest"
 	"github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/store"
@@ -110,6 +111,42 @@ func (s *DnsGroupResourceDetailsService) Create(w http.ResponseWriter, r *http.R
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupResourceDetailsService) Read(w http.ResponseWriter, r *http.Request) {
+	var action = r.URL.Query().Get("action")
+	if strings.ToLower(action) == "template" {
+		var templates = make([]rest.DnsTemplateDataType, 0)
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "POST",
+			Header:  []string{},
+			Query:   []string{},
+			Request: model.Request{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "PUT",
+			Header:  []string{},
+			Query:   []string{},
+			Request: model.Request{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "DELETE",
+			Header:  []string{},
+			Query:   []string{},
+			Request: nil,
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "GET",
+			Header:  []string{},
+			Query:   []string{"action=template"},
+			Request: nil,
+		})
+		tErr := utils.RestParseResponse(w, r, &rest.DnsTemplateResponse{
+			Templates: templates,
+		})
+		if tErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			s.Log.Errorf("Error encoding template(s) summary response, Error: %v", tErr)
+		}
+		return
+	}
 	groupName := getResourceGroup(r)
 	hostname := getResourceHost(r)
 	group, err := s.Store.GetGroupBucket().GetGroupById(groupName)
@@ -196,6 +233,7 @@ func (s *DnsGroupResourceDetailsService) Delete(w http.ResponseWriter, r *http.R
 		writeResourceDetailsErrorResponse(w, r, s.Log, group.Name, "get-resource-datas", fmt.Sprintf("deleting dns record for host: %s, Error:", hostname, err), http.StatusInternalServerError)
 		return
 	}
+	s.Log.Infof("Group: %v -> Resource: %s has been deleted!!", group.Name, hostname)
 	w.WriteHeader(http.StatusOK)
 	response := model.Response{
 		Status:  http.StatusOK,

@@ -42,17 +42,29 @@ type dnsService struct {
 }
 
 func (s *dnsService) pipeHandler(message string) {
-
+	tokens := strings.Split(message, " ")
+	if "reload" == tokens[0] {
+		s.Store.GetGroupBucket().ReLoad()
+		s.pipe.Write([]byte(fmt.Sprintf("reponse %s %s", "ok", tokens[1])))
+	} else if "load" == tokens[0] {
+		groupId := strings.TrimSpace(tokens[1])
+		g, _ := s.Store.GetGroupBucket().GetGroupById(groupId)
+		s.Store.GetGroupBucket().GetGroupStore(g)
+		s.pipe.Write([]byte(fmt.Sprintf("reponse %s %s", "ok", tokens[2])))
+	} else if "shutdown" == tokens[0] {
+		s.pipe.Write([]byte(fmt.Sprintf("reponse %s %s", "ok", tokens[1])))
+		os.Exit(0)
+	}
 }
 
 // Listen starts a DNS server on port 53
-func (s *dnsService) Listen(ipAddress string, port int, pipeAddress string, pipePort int) error {
+func (s *dnsService) Listen(ipAddress string, port int, pipeAddress string, pipePort int, pipeResponsePort int) error {
 	var err error
 	ipTokens := strings.Split(ipAddress, ".")
 	if len(ipTokens) < 4 {
 		return errs.New(fmt.Sprintf("DNSServer: Invalid ip address: %s", ipAddress))
 	}
-	s.pipe, err = pnet.NewInputPipeWith(pipeAddress, pipePort, pnet.PipeHandler(s.pipeHandler), s.log)
+	s.pipe, err = pnet.NewInputOutputPipeWith(pipeAddress, pipePort, pipeAddress, pipeResponsePort, pnet.PipeHandler(s.pipeHandler), s.log)
 	if err == nil {
 		err := s.pipe.Start()
 		if err != nil {
@@ -212,10 +224,10 @@ func New(rwDirPath string, logger log.Logger, forwarders []net.UDPAddr) model.DN
 }
 
 // Start conveniently init every parts of DNS service.
-func Start(rwDirPath string, ip string, port int, pipeIP string, pipePort int, logger log.Logger, forwarders []net.UDPAddr) model.DNSServer {
+func Start(rwDirPath string, ip string, port int, pipeIP string, pipePort int, pipeResponsePort int, logger log.Logger, forwarders []net.UDPAddr) model.DNSServer {
 	s := New(rwDirPath, logger, forwarders)
 	s.(*dnsService).Store.Load()
-	go s.Listen(ip, port, pipeIP, pipePort)
+	go s.Listen(ip, port, pipeIP, pipePort, pipeResponsePort)
 	return s
 }
 

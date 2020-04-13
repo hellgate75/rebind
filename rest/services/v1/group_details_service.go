@@ -5,6 +5,7 @@ import (
 	"github.com/hellgate75/rebind/data"
 	"github.com/hellgate75/rebind/log"
 	"github.com/hellgate75/rebind/model"
+	"github.com/hellgate75/rebind/model/rest"
 	"github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/store"
@@ -23,61 +24,8 @@ type DnsGroupService struct {
 	BaseUrl string
 }
 
-type Action string
-
-const (
-	AddResoource    Action = "ADD"
-	UpdateResoource Action = "UPDATE"
-	DeleteResoource Action = "DELTE"
-)
-
-func (a Action) Equals(act Action) bool {
-	return string(act) != "" && strings.ToUpper(string(act)) == strings.ToUpper(string(a))
-}
-
-func (a Action) Same(act string) bool {
-	return act != "" && strings.ToUpper(act) == strings.ToUpper(string(a))
-}
-
-func (a Action) String(act string) string {
-	return strings.ToUpper(string(a))
-}
-
-type Field string
-
-func (f Field) Equals(field Field) bool {
-	return string(field) != "" && strings.ToUpper(string(field)) == strings.ToUpper(string(f))
-}
-
-func toField(value string) Field {
-	return Field(strings.ToLower(value))
-}
-
-type DnsGroupResponse struct {
-	Group     data.Group        `yaml:"group" json:"group" xml:"group"`
-	Resources []store.DNSRecord `yaml:"resources,omitempty" json:"resources,omitempty" xml:"resources,omitempty"`
-}
-
-type DnsUpdateRequest struct {
-	Action Action            `yaml:"action" json:"action" xml:"action"`
-	Field  string            `yaml:"field" json:"field" xml:"field"`
-	Data   UpdateRequestForm `yaml:"data,omitempty" json:"data,omitempty" xml:"data,omitempty"`
-}
-
-type UpdateListForm struct {
-	Value string `yaml:"value,omitempty" json:"value,omitempty" xml:"value,omitempty"`
-	Index int    `yaml:"index,omitempty" json:"index,omitempty" xml:"index,omitempty"`
-}
-
-type UpdateRequestForm struct {
-	ListData   UpdateListForm `yaml:"fromList,omitempty" json:"fromList,omitempty" xml:"from-list,omitempty"`
-	RecordData model.Request  `yaml:"fromRecord,omitempty" json:"fromRecord,omitempty" xml:"from-record,omitempty"`
-	NewValue   interface{}    `yaml:"value,omitempty" json:"value,omitempty" xml:"value,omitempty"`
-}
-
-type GroupCreationRequest struct {
-	Forwarders []net2.UDPAddr `yaml:"fowarders" json:"fowarders" xml:"fowarders"`
-	Domains    []string       `yaml:"domains,omitempty" json:"domains,omitempty" xml:"domains,omitempty"`
+func toField(value string) rest.Field {
+	return rest.Field(strings.ToLower(value))
 }
 
 func getGroup(r *http.Request) string {
@@ -96,7 +44,7 @@ func (s *DnsGroupService) Create(w http.ResponseWriter, r *http.Request) {
 		writeUpdateErrorResponse(w, r, s.Log, group.Name, "create-group", "group already exists", http.StatusConflict)
 		return
 	}
-	var req GroupCreationRequest
+	var req rest.GroupCreationRequest
 	err = utils.RestParseRequest(w, r, &req)
 	if err != nil {
 		writeUpdateErrorResponse(w, r, s.Log, group.Name, "create-group", fmt.Sprintf("decoding group creation request, Error: %v", err), http.StatusBadRequest)
@@ -120,7 +68,7 @@ func (s *DnsGroupService) Create(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data:    DnsGroupsResponse{Groups: []data.Group{group}},
+		Data:    rest.DnsGroupsResponse{Groups: []data.Group{group}},
 	}
 	w.WriteHeader(http.StatusCreated)
 	err = utils.RestParseResponse(w, r, &response)
@@ -133,6 +81,42 @@ func (s *DnsGroupService) Create(w http.ResponseWriter, r *http.Request) {
 // Read is HTTP handler of GET model.Request.
 // Use for reading existed records on DNS server.
 func (s *DnsGroupService) Read(w http.ResponseWriter, r *http.Request) {
+	var action = r.URL.Query().Get("action")
+	if strings.ToLower(action) == "template" {
+		var templates = make([]rest.DnsTemplateDataType, 0)
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "POST",
+			Header:  []string{},
+			Query:   []string{},
+			Request: rest.GroupCreationRequest{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "PUT",
+			Header:  []string{},
+			Query:   []string{},
+			Request: rest.DnsUpdateRequest{},
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "DELETE",
+			Header:  []string{},
+			Query:   []string{},
+			Request: nil,
+		})
+		templates = append(templates, rest.DnsTemplateDataType{
+			Method:  "GET",
+			Header:  []string{},
+			Query:   []string{"action=template"},
+			Request: nil,
+		})
+		tErr := utils.RestParseResponse(w, r, &rest.DnsTemplateResponse{
+			Templates: templates,
+		})
+		if tErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			s.Log.Errorf("Error encoding template(s) summary response, Error: %v", tErr)
+		}
+		return
+	}
 	groupName := getGroup(r)
 	group, err := s.Store.GetGroupBucket().GetGroupById(groupName)
 	if err != nil {
@@ -155,7 +139,7 @@ func (s *DnsGroupService) Read(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "OK",
-		Data: DnsGroupResponse{
+		Data: rest.DnsGroupResponse{
 			Group:     group,
 			Resources: recs,
 		},
@@ -177,7 +161,7 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 		writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", "group doesn't exists", http.StatusNotFound)
 		return
 	}
-	var req DnsUpdateRequest
+	var req rest.DnsUpdateRequest
 	err = utils.RestParseRequest(w, r, &req)
 	if err != nil {
 		writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("cannot parse request, Error: %v", err), http.StatusBadRequest)
@@ -192,9 +176,9 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var field = toField(req.Field)
-	if DeleteResoource.Equals(req.Action) {
+	if rest.DeleteResoource.Equals(req.Action) {
 		//Request delete of an element
-		if field.Equals(Field("domain")) {
+		if field.Equals(rest.Field("domain")) {
 			value := req.Data.ListData.Value
 			index := req.Data.ListData.Index
 			if value == "" {
@@ -235,11 +219,11 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("domains")) {
+		} else if field.Equals(rest.Field("domains")) {
 			group.Domains = []string{}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("forwarder")) {
+		} else if field.Equals(rest.Field("forwarder")) {
 			value := req.Data.ListData.Value
 			index := req.Data.ListData.Index
 			if value == "" {
@@ -280,18 +264,18 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("forwarders")) {
+		} else if field.Equals(rest.Field("forwarders")) {
 			group.Forwarders = []net2.UDPAddr{}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("data")) ||
-			field.Equals(Field("resources")) {
+		} else if field.Equals(rest.Field("data")) ||
+			field.Equals(rest.Field("resources")) {
 			gsd, err := s.Store.GetGroupBucket().GetGroupStore(group)
 			if err == nil {
 				gsd.ClearData()
 				_, err = s.Store.GetGroupBucket().SaveGroup(gsd, group)
 			}
-		} else if field.Equals(Field("resource")) {
+		} else if field.Equals(rest.Field("resource")) {
 			gsd, err := s.Store.GetGroupBucket().GetGroupStore(group)
 			if err == nil {
 				if req.Data.ListData.Value == "" {
@@ -308,10 +292,10 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot delete field type: %v", field), http.StatusNotImplemented)
 			return
 		}
-	} else if UpdateResoource.Equals(req.Action) {
+	} else if rest.UpdateResoource.Equals(req.Action) {
 		//Request Update of an element
-		if field.Equals(Field("domain")) ||
-			field.Equals(Field("domains")) {
+		if field.Equals(rest.Field("domain")) ||
+			field.Equals(rest.Field("domains")) {
 			if req.Data.NewValue == nil ||
 				req.Data.NewValue == "" {
 				writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", "Request.Data.NewValue connot be nil or empty, as update value", http.StatusBadRequest)
@@ -340,8 +324,8 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			group.Domains[index] = fmt.Sprintf("%v", req.Data.NewValue)
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("forwarder")) ||
-			field.Equals(Field("forwarders")) {
+		} else if field.Equals(rest.Field("forwarder")) ||
+			field.Equals(rest.Field("forwarders")) {
 			if req.Data.NewValue == nil ||
 				req.Data.NewValue == "" {
 				writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", "Request.Data.NewValue connot be nil or empty, as update value", http.StatusBadRequest)
@@ -375,21 +359,21 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("data")) ||
-			field.Equals(Field("resources")) {
+		} else if field.Equals(rest.Field("data")) ||
+			field.Equals(rest.Field("resources")) {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot update field type: %v", field), http.StatusNotImplemented)
 			return
-		} else if field.Equals(Field("resource")) {
+		} else if field.Equals(rest.Field("resource")) {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot update field type: %v", field), http.StatusNotImplemented)
 			return
 		} else {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot update field type: %v", field), http.StatusNotImplemented)
 			return
 		}
-	} else if AddResoource.Equals(req.Action) {
+	} else if rest.AddResoource.Equals(req.Action) {
 		//Request a new resource in an element
-		if field.Equals(Field("domain")) ||
-			field.Equals(Field("domains")) {
+		if field.Equals(rest.Field("domain")) ||
+			field.Equals(rest.Field("domains")) {
 			if req.Data.NewValue == nil ||
 				req.Data.NewValue == "" {
 				writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", "Request.Data.NewValue connot be nil or empty, as update value", http.StatusBadRequest)
@@ -398,8 +382,8 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			group.Domains = append(group.Domains, fmt.Sprintf("%v", req.Data.NewValue))
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("forwarder")) ||
-			field.Equals(Field("forwarders")) {
+		} else if field.Equals(rest.Field("forwarder")) ||
+			field.Equals(rest.Field("forwarders")) {
 			if req.Data.NewValue == nil ||
 				req.Data.NewValue == "" {
 				writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", "Request.Data.NewValue connot be nil or empty, as update value", http.StatusBadRequest)
@@ -413,11 +397,11 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			}
 			s.Store.GetGroupBucket().UpdateExistingGroup(group)
 			err = s.Store.GetGroupBucket().SaveMeta()
-		} else if field.Equals(Field("data")) ||
-			field.Equals(Field("resources")) {
+		} else if field.Equals(rest.Field("data")) ||
+			field.Equals(rest.Field("resources")) {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot update field type: %v", field), http.StatusNotImplemented)
 			return
-		} else if field.Equals(Field("resource")) {
+		} else if field.Equals(rest.Field("resource")) {
 			writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Cannot update field type: %v", field), http.StatusNotImplemented)
 			return
 		} else {
@@ -425,7 +409,8 @@ func (s *DnsGroupService) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-
+		writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("Unknown action %v on field type: %v", req.Action, field), http.StatusNotImplemented)
+		return
 	}
 	if err != nil {
 		writeUpdateErrorResponse(w, r, s.Log, group.Name, "update-group", fmt.Sprintf("unable to save group data, Error:", err), http.StatusInternalServerError)
@@ -449,10 +434,10 @@ func writeUpdateErrorResponse(w http.ResponseWriter, r *http.Request, logger log
 	}
 }
 
-func isCorrectAction(act Action) bool {
-	return AddResoource.Equals(act) ||
-		DeleteResoource.Equals(act) ||
-		UpdateResoource.Equals(act)
+func isCorrectAction(act rest.Action) bool {
+	return rest.AddResoource.Equals(act) ||
+		rest.DeleteResoource.Equals(act) ||
+		rest.UpdateResoource.Equals(act)
 }
 
 // Delete is HTTP handler of DELETE model.Request.
@@ -479,7 +464,7 @@ func (s *DnsGroupService) Delete(w http.ResponseWriter, r *http.Request) {
 		writeUpdateErrorResponse(w, r, s.Log, groupName, "delete-group", "requested group couldn't be deleted", http.StatusInternalServerError)
 		return
 	}
-	s.Log.Infof("Group: %v was deleted!!", group)
+	s.Log.Infof("Group: %s has been deleted!!", group.Name)
 	var recs = make([]store.DNSRecord, 0)
 	for _, key := range gsd.Keys() {
 		lst, _ := gsd.Get(key)
@@ -491,7 +476,7 @@ func (s *DnsGroupService) Delete(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusOK,
 		Message: "DELETED",
-		Data: DnsGroupResponse{
+		Data: rest.DnsGroupResponse{
 			Group:     group,
 			Resources: recs,
 		},

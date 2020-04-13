@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/hellgate75/rebind/log"
-	"github.com/hellgate75/rebind/model"
+	"github.com/hellgate75/rebind/model/rest"
 	pnet "github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
 	"github.com/hellgate75/rebind/rest/services"
@@ -24,7 +24,7 @@ var listenIP string
 var listenPort int
 var dnsPipeIP string
 var dnsPipePort int
-var dnsPipeResponsePort int
+var dnspipeResponsePort int
 var tlsCert string
 var tlsKey string
 
@@ -35,12 +35,12 @@ var defaultForwarders = make([]net.UDPAddr, 0)
 
 func init() {
 	logger.Info("Initializing Re-Web Rest Server ....")
-	flag.StringVar(&rwDirPath, "rwdir", model.DefaultStorageFolder, "dns storage dir")
-	flag.StringVar(&listenIP, "listen-ip", model.DefaultIpAddress, "http server ip")
-	flag.IntVar(&listenPort, "listen-port", model.DefaultRestServerPort, "http server port")
-	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", model.DefaultDnsPipeAddress, "tcp dns pipe ip")
-	flag.IntVar(&dnsPipePort, "dns-pipe-port", model.DefaultDnsPipePort, "tcp dns pipe port")
-	flag.IntVar(&dnsPipeResponsePort, "dns-pipe-response-port", model.DefaultDnsPipePort, "tcp dns pipe responses port")
+	flag.StringVar(&rwDirPath, "rwdir", rest.DefaultStorageFolder, "dns storage dir")
+	flag.StringVar(&listenIP, "listen-ip", rest.DefaultIpAddress, "http server ip")
+	flag.IntVar(&listenPort, "listen-port", rest.DefaultRestServerPort, "http server port")
+	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", rest.DefaultDnsPipeAddress, "tcp dns pipe ip")
+	flag.IntVar(&dnsPipePort, "dns-pipe-port", rest.DefaultDnsAnswerPipePort, "tcp dns pipe port")
+	flag.IntVar(&dnspipeResponsePort, "dns-pipe-response-port", rest.DefaultDnsPipePort, "tcp dns pipe responses port")
 	flag.StringVar(&tlsCert, "tsl-cert", "", "tls certificate file path")
 	flag.StringVar(&tlsKey, "tsl-key", "", "tls certificate key file path")
 }
@@ -59,12 +59,12 @@ func main() {
 	}
 
 	// Improve list of default group forwarders if provided
-	defaultForwarders = append(defaultForwarders, model.DefaultGroupForwarders...)
+	defaultForwarders = append(defaultForwarders, rest.DefaultGroupForwarders...)
 
 	// Create network Pipe Stream with the dns server
-	pipe, err := pnet.NewInputOutputPipeWith(dnsPipeIP, dnsPipePort, dnsPipeIP, dnsPipeResponsePort, nil, logger)
+	pipe, err := pnet.NewInputOutputPipeWith(dnsPipeIP, dnsPipePort, dnsPipeIP, dnspipeResponsePort, nil, logger)
 	if err != nil {
-		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v/%v\n", dnsPipePort, dnsPipeResponsePort)
+		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v/%v\n", dnsPipePort, dnspipeResponsePort)
 	}
 	// Create Data Store
 	store := registry.NewStore(logger, rwDirPath, defaultForwarders)
