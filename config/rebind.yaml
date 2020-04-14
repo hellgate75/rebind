@@ -1,7 +1,0 @@
-dataDir: /var/rebind
-configDir: /etc/rebind
-listenIp: 0.0.0.0
-listenPort: 53
-dnsPipeIp: 127.0.0.1
-dnsPipePort: 953
-dnsPipeResponsePort: 954

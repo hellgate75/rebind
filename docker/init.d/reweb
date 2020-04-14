@@ -18,6 +18,8 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 # Don't modify this line, change or create /etc/default/reweb.
 OPTIONS=""
 INITCONFIG=no
+USERNAME=rebind
+USERGROUP=rebind
 
 test -f /etc/default/reweb && . /etc/default/reweb
 
@@ -61,9 +63,9 @@ case "$1" in
 	fi
 
     if [ "X$INITCONFIG" != "Xno" ] && [ ! -e /etc/rebind/reweb.yaml ] ; then
-       /usr/sbin/reweb -init-and-exit true
+       su - $USERNAME && /usr/sbin/reweb -init-and-exit true
     fi
-	if start-stop-daemon --start --oknodo --quiet --exec /usr/sbin/reweb \
+	if start-stop-daemon --start --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/reweb \
 		--pidfile ${PIDFILE} -- $OPTIONS; then
 	    log_end_msg 0
 	else
@@ -81,7 +83,7 @@ case "$1" in
 	pid=$(/usr/sbin/rndc stop -p | awk '/^pid:/ {print $2}') || true
 	if [ -z "$pid" ]; then		# no pid found, so either not running, or error
 	    pid=$(pgrep -f ^/usr/sbin/reweb) || true
-	    start-stop-daemon --stop --oknodo --quiet --exec /usr/sbin/reweb \
+	    start-stop-daemon --stop --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/reweb \
 		    --pidfile ${PIDFILE} -- $OPTIONS
 	fi
 	if [ -n "$pid" ]; then

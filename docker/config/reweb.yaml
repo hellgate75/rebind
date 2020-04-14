@@ -8,7 +8,7 @@ dnsPipeResponsePort: 953
 tlsCertFilePath: ""
 tlsKeyFilePath: ""
 enableFileLogging: true
-logVerbosity: INFO
+logVerbosity: DEBUG
 logFilePath: /var/log/rebind
 enableLogRotate: true
 logMaxFileSize: 1024

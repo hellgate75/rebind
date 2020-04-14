@@ -15,6 +15,10 @@ if [ "-h" = "$1" ] || [ "--help" = "$1" ]; then
 fi
 
 echo "Re-Bind: Starting Re-Bind Container ..."
+chown -R rebind:rebind /var/rebind
+chown -R rebind:rebind /etc/rebind
+chmod -Rf 0660 /var/rebind
+chown -Rf 0660 /etc/rebind
 
 if [ $# -gt 0 ]; then
 	echo "Re-Bind: Running command: $@"
