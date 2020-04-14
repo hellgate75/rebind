@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/hellgate75/rebind/log"
+	"github.com/hellgate75/rebind/model"
 	"github.com/hellgate75/rebind/model/rest"
 	pnet "github.com/hellgate75/rebind/net"
 	"github.com/hellgate75/rebind/registry"
@@ -20,11 +21,14 @@ import (
 )
 
 var rwDirPath string
+var configDirPath string
+var initializeAndExit bool
+var useConfigFile bool
 var listenIP string
 var listenPort int
 var dnsPipeIP string
 var dnsPipePort int
-var dnspipeResponsePort int
+var dnsPipeResponsePort int
 var tlsCert string
 var tlsKey string
 
@@ -35,24 +39,43 @@ var defaultForwarders = make([]net.UDPAddr, 0)
 
 func init() {
 	logger.Info("Initializing Re-Web Rest Server ....")
-	flag.StringVar(&rwDirPath, "rwdir", rest.DefaultStorageFolder, "dns storage dir")
+	flag.StringVar(&rwDirPath, "data-dir", rest.DefaultStorageFolder, "dns storage dir")
+	flag.StringVar(&configDirPath, "config-dir", rest.DefaultConfigFolder, "dns config dir")
+	flag.BoolVar(&initializeAndExit, "init-and-exit", false, "initialize config in the config dir and exit")
+	flag.BoolVar(&useConfigFile, "use-config-file", false, "use config file instead parameters")
 	flag.StringVar(&listenIP, "listen-ip", rest.DefaultIpAddress, "http server ip")
 	flag.IntVar(&listenPort, "listen-port", rest.DefaultRestServerPort, "http server port")
 	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", rest.DefaultDnsPipeAddress, "tcp dns pipe ip")
 	flag.IntVar(&dnsPipePort, "dns-pipe-port", rest.DefaultDnsAnswerPipePort, "tcp dns pipe port")
-	flag.IntVar(&dnspipeResponsePort, "dns-pipe-response-port", rest.DefaultDnsPipePort, "tcp dns pipe responses port")
+	flag.IntVar(&dnsPipeResponsePort, "dns-pipe-response-port", rest.DefaultDnsPipePort, "tcp dns pipe responses port")
 	flag.StringVar(&tlsCert, "tsl-cert", "", "tls certificate file path")
 	flag.StringVar(&tlsKey, "tsl-key", "", "tls certificate key file path")
 }
 
 func main() {
-	logger.Info("Starting Re-Web Rest Server ...")
 	flag.Parse()
 	if utils.StringsListContainItem("-h", flag.Args(), true) ||
 		utils.StringsListContainItem("--help", flag.Args(), true) {
 		flag.Usage()
 		os.Exit(0)
 	}
+	if initializeAndExit {
+		logger.Info("Initialize Re-Web Rest Server and Exit!!")
+		config := model.ReWebConfig{
+			DataDirPath:         rwDirPath,
+			ConfigDirPath:       configDirPath,
+			ListenIP:            listenIP,
+			ListenPort:          listenPort,
+			DnsPipeIP:           dnsPipeIP,
+			DnsPipePort:         dnsPipePort,
+			DnsPipeResponsePort: dnsPipeResponsePort,
+			TlsCert:             tlsCert,
+			TlsKey:              tlsKey,
+		}
+		model.SaveConfig(configDirPath, "reweb", &config)
+		os.Exit(0)
+	}
+	logger.Info("Starting Re-Web Rest Server ...")
 	if err := os.MkdirAll(rwDirPath, 0666); err != nil {
 		logger.Errorf("Create rwdirpath: %v error: %v", rwDirPath, err)
 		return
@@ -62,9 +85,9 @@ func main() {
 	defaultForwarders = append(defaultForwarders, rest.DefaultGroupForwarders...)
 
 	// Create network Pipe Stream with the dns server
-	pipe, err := pnet.NewInputOutputPipeWith(dnsPipeIP, dnsPipePort, dnsPipeIP, dnspipeResponsePort, nil, logger)
+	pipe, err := pnet.NewInputOutputPipeWith(dnsPipeIP, dnsPipePort, dnsPipeIP, dnsPipeResponsePort, nil, logger)
 	if err != nil {
-		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v/%v\n", dnsPipePort, dnspipeResponsePort)
+		logger.Fatalf("Unable to create NetPipe in listen: %v and bind: %v/%v\n", dnsPipePort, dnsPipeResponsePort)
 	}
 	// Create Data Store
 	store := registry.NewStore(logger, rwDirPath, defaultForwarders)

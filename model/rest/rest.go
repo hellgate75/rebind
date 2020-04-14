@@ -14,6 +14,7 @@ import (
 
 const (
 	DefaultStorageFolder     string = "/var/rebind"
+	DefaultConfigFolder      string = "/etc/rebind"
 	DefaultDnsServerPort            = 53
 	DefaultRestServerPort           = 9000
 	DefaultIpAddress                = "0.0.0.0"

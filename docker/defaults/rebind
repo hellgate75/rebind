@@ -1,0 +1,6 @@
+#
+# initialize config in file
+INITCONFIG=no
+
+# startup options for the server
+OPTIONS="-use-config-file true"
