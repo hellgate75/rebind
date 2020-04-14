@@ -33,25 +33,31 @@ COPY init.d/reweb /etc/init.d
 COPY install-golang.sh /root
 COPY docker-entrypoint.sh /
 
-# Enable Re-Bin and Re-Web
+# Install base features
 RUN dos2unix /root/install-golang.sh &&\
  chmod +x /root/install-golang.sh &&\
  sh -c /root/install-golang.sh &&\
- go get -u github.com/rebind/rebind &&\
- go get -u github.com/rebind/reweb &&\
- chmod +x /root/go/bin/* &&\
- mv /root/go/bin/reweb /usr/sbin/ &&\
- mv /root/go/bin/reweb /usr/sbin/ &&\
  dos2unix /docker-entrypoint.sh &&\
  dos2unix /etc/rebind/* &&\
  dos2unix /etc/init.d/* &&\
- mkdir /var/log/bind &&\
- chown bind:bind /var/log/bind &&\
- update-rc.d rebind defaults &&\
- update-rc.d rebind enable &&\
- update-rc.d reweb defaults &&\
- update-rc.d reweb enable &&\
+ mkdir /var/log/rebind &&\
+ chown bind:bind /var/log/rebind &&\
  chmod +x /docker-entrypoint.sh
+
+# Install Re-Bind and Re-Web via git repo
+RUN  go get -u github.com/rebind/rebind &&\
+ go get -u github.com/rebind/reweb &&\
+ chmod +x /root/go/bin/* &&\
+ mv /root/go/bin/reweb /usr/sbin/ &&\
+ mv /root/go/bin/reweb /usr/sbin/
+
+
+# Enable Re-Bind and Re-Web services
+RUN  update-rc.d rebind defaults &&\
+     update-rc.d rebind enable &&\
+     update-rc.d reweb defaults &&\
+     update-rc.d reweb enable
+
 
 # Exposed volums : /etc/rebind: Configuration volume, /var/rebind: Data volume
 
