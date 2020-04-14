@@ -25,7 +25,7 @@ RUN apt-get update \
 COPY config/rebind.yaml /etc/rebind
 COPY config/reweb.yaml /etc/rebind
 COPY defaults/rebind /etc/defaults
-COPY defaults/web /etc/defaults
+COPY defaults/reweb /etc/defaults
 COPY init.d/rebind /etc/init.d
 COPY init.d/reweb /etc/init.d
 
