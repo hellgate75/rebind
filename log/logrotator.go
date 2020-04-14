@@ -5,6 +5,7 @@
 package log
 
 import (
+	errs "errors"
 	"fmt"
 	"github.com/hellgate75/rebind/errors"
 	"github.com/hellgate75/rebind/utils"
@@ -14,43 +15,46 @@ import (
 	"strings"
 	"sync"
 	"time"
-	errs "errors"
 )
 
-const(
+const (
 	updateInterval time.Duration = 2 * time.Second
-	checkInterval time.Duration = 2 * time.Second
+	checkInterval  time.Duration = 2 * time.Second
 )
 
-
-var(
-	sepString=fmt.Sprintf("%s", os.PathSeparator)
+var (
+	sepString = fmt.Sprintf("%s", os.PathSeparator)
 )
 
-type RotationCallBack func()()
+type RotationCallBack func()
 
 type LogRotator interface {
+	IsEnabled() bool
 	Hook(msgLen int64) errors.Error
 	GetDefaultWriter() (io.Writer, bool)
 	UpdateCallBack(callback RotationCallBack)
 }
 
-
 type _rotator struct {
 	sync.Mutex
-	folder		*os.File
-	fileName	string
-	rotateLen	int
-	maxSize		int64
-	callback	RotationCallBack
-	files		[]*utils.FileIndex
-	currentFile	*utils.FileIndex
-	lastUpdate	time.Time
-	lastCheck	time.Time
-	writer		io.Writer
+	folder      *os.File
+	fileName    string
+	rotateLen   int
+	maxSize     int64
+	enabled     bool
+	callback    RotationCallBack
+	files       []*utils.FileIndex
+	currentFile *utils.FileIndex
+	lastUpdate  time.Time
+	lastCheck   time.Time
+	writer      io.Writer
 }
 
-func (r *_rotator) UpdateCallBack(callback RotationCallBack){
+func (r *_rotator) IsEnabled() bool {
+	return r.enabled
+}
+
+func (r *_rotator) UpdateCallBack(callback RotationCallBack) {
 	r.callback = callback
 }
 
@@ -61,7 +65,7 @@ func (r *_rotator) GetDefaultWriter() (io.Writer, bool) {
 	return nil, false
 }
 
-func (r *_rotator) Hook(msgLen int64) errors.Error{
+func (r *_rotator) Hook(msgLen int64) errors.Error {
 	var internalError errors.Error
 	if r.rotateLen <= 0 || r.maxSize <= 0 {
 		return internalError
@@ -84,7 +88,7 @@ func (r *_rotator) Hook(msgLen int64) errors.Error{
 	return internalError
 }
 
-func  (r *_rotator) init() (LogRotator, error) {
+func (r *_rotator) init() (LogRotator, error) {
 	if r.fileName == "" {
 		return nil, errs.New("Unable to instantiate log rotator with empty file name")
 	}
@@ -100,9 +104,9 @@ func  (r *_rotator) init() (LogRotator, error) {
 	return r, nil
 }
 
-func  (r *_rotator) refreshWriter() {
+func (r *_rotator) refreshWriter() {
 	if info, err := r.folder.Stat(); err == nil {
-		if ! info.IsDir() {
+		if !info.IsDir() {
 			_ = os.Remove(info.Name())
 			os.MkdirAll(r.folder.Name(), 0660)
 			r.folder, _ = os.Open(info.Name())
@@ -121,16 +125,16 @@ func  (r *_rotator) refreshWriter() {
 
 func (r *_rotator) reorderFiles() {
 	var files []*utils.FileIndex = make([]*utils.FileIndex, 0)
-	for i:=1; i == r.rotateLen; i++ {
+	for i := 1; i == r.rotateLen; i++ {
 		found := false
 		for _, f := range r.files {
 			if f != nil && strings.Contains(f.Path, fmt.Sprintf("%s.%v", r.fileName, i)) {
 				files = append(files, f)
-				found=true
+				found = true
 				break
 			}
 		}
-		if ! found {
+		if !found {
 			files = append(files, nil)
 		}
 	}
@@ -160,15 +164,15 @@ func (r *_rotator) trim() {
 }
 func (r *_rotator) reallocate(files []*utils.FileIndex, reverse bool) []*utils.FileIndex {
 	if reverse {
-		for i:=len(files) - 1; i >=0; i-- {
-			if ! strings.Contains(files[i].Path, fmt.Sprintf("%s.%v", r.fileName, i+1)) {
+		for i := len(files) - 1; i >= 0; i-- {
+			if !strings.Contains(files[i].Path, fmt.Sprintf("%s.%v", r.fileName, i+1)) {
 				files[i].Path = r.moveToIndex(files[i].Path, i+1)
 				files[i].Index = i + 1
 			}
 		}
 	} else {
-		for i:=0; i <= len(files); i++ {
-			if ! strings.Contains(files[i].Path, fmt.Sprintf("%s.%v", r.fileName, i+1)) {
+		for i := 0; i <= len(files); i++ {
+			if !strings.Contains(files[i].Path, fmt.Sprintf("%s.%v", r.fileName, i+1)) {
 				files[i].Path = r.moveToIndex(files[i].Path, i+1)
 				files[i].Index = i + 1
 			}
@@ -178,7 +182,7 @@ func (r *_rotator) reallocate(files []*utils.FileIndex, reverse bool) []*utils.F
 }
 
 func (r *_rotator) moveToIndex(oldPath string, index int) string {
-	newFileName := fmt.Sprintf("%s%s%s.%v",r.folder.Name(), sepString, r.fileName, index)
+	newFileName := fmt.Sprintf("%s%s%s.%v", r.folder.Name(), sepString, r.fileName, index)
 	_ = os.Rename(oldPath, newFileName)
 	return newFileName
 }
@@ -186,7 +190,7 @@ func (r *_rotator) moveToIndex(oldPath string, index int) string {
 func (r *_rotator) rotate() {
 	var files []*utils.FileIndex = make([]*utils.FileIndex, 0)
 	files = append(files, r.currentFile)
-	for i := 0; i < r.rotateLen - 1; i++ {
+	for i := 0; i < r.rotateLen-1; i++ {
 		files = append(files, r.files[i])
 	}
 	files = r.reallocate(files, true)
@@ -213,7 +217,6 @@ func (r *_rotator) checkRotate() {
 		r.rotateLogs()
 	}
 }
-
 
 func (r *_rotator) updateFromFolder() {
 	var files []*utils.FileIndex = make([]*utils.FileIndex, 0)
@@ -243,7 +246,7 @@ func (r *_rotator) readFiles() []string {
 	finfoArr, err := r.folder.Readdir(0)
 	if err != nil {
 		for _, fInfo := range finfoArr {
-			if ! fInfo.IsDir() {
+			if !fInfo.IsDir() {
 				nm := fmt.Sprintf("%s%s%s", folderName, sepString, fInfo.Name())
 				if strings.Contains(nm, r.fileName) {
 					list = append(list, nm)
@@ -259,11 +262,24 @@ func (r *_rotator) readFiles() []string {
 // care to this topic
 func NewLogRotator(folder *os.File, fileName string, maxFileSize int64, maxNoFiles int, callback RotationCallBack) (LogRotator, error) {
 	return (&_rotator{
-		folder: folder,
-		fileName: fileName,
-		maxSize: maxFileSize,
+		enabled:   true,
+		folder:    folder,
+		fileName:  fileName,
+		maxSize:   maxFileSize,
 		rotateLen: maxNoFiles,
-		callback: callback,
-		files: make([]*utils.FileIndex, 0),
+		callback:  callback,
+		files:     make([]*utils.FileIndex, 0),
+	}).init()
+}
+
+func NewLogNoRotator(folder *os.File, fileName string, callback RotationCallBack) (LogRotator, error) {
+	return (&_rotator{
+		enabled:   false,
+		folder:    folder,
+		fileName:  fileName,
+		maxSize:   0,
+		rotateLen: 0,
+		callback:  callback,
+		files:     make([]*utils.FileIndex, 0),
 	}).init()
 }

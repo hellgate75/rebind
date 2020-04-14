@@ -22,6 +22,12 @@ var rwDirPath string
 var configDirPath string
 var initializeAndExit bool
 var useConfigFile bool
+var enableFileLogging bool
+var logFilePath string
+var logVerbosity string
+var enableLogRotate bool
+var logMaxFileSize int64
+var logMaxFileCount int
 var listenIP string
 var listenPort int
 var dnsPipeIP string
@@ -39,6 +45,12 @@ func init() {
 	flag.StringVar(&configDirPath, "config-dir", rest.DefaultConfigFolder, "dns config dir")
 	flag.BoolVar(&initializeAndExit, "init-and-exit", false, "initialize config in the config dir and exit")
 	flag.BoolVar(&useConfigFile, "use-config-file", false, "use config file instead parameters")
+	flag.BoolVar(&enableFileLogging, "enable-file-log", false, "enable logginf over file")
+	flag.StringVar(&logFilePath, "log-file-path", rest.DefaultLogFileFolder, "log file path")
+	flag.StringVar(&logVerbosity, "log-verbosity", rest.DefaultLogFileLevel, "log file verbosity level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL)")
+	flag.BoolVar(&enableLogRotate, "log-rotate", true, "log file rotation enabled")
+	flag.Int64Var(&logMaxFileSize, "log-max-size", 1024, "log file rotation max file size in bytes")
+	flag.IntVar(&logMaxFileCount, "log-count", 1024, "log file rotation max number of file")
 	flag.StringVar(&listenIP, "listen-ip", rest.DefaultIpAddress, "dns forward ip")
 	flag.IntVar(&listenPort, "listen-port", rest.DefaultDnsServerPort, "dns forward port")
 	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", rest.DefaultDnsPipeAddress, "tcp dns pipe ip")
@@ -64,9 +76,68 @@ func main() {
 			DnsPipeIP:           dnsPipeIP,
 			DnsPipePort:         dnsPipePort,
 			DnsPipeResponsePort: dnsPipeResponsePort,
+			EnableFileLogging:   enableFileLogging,
+			LogVerbosity:        logVerbosity,
+			LogFilePath:         logFilePath,
+			LogFileCount:        logMaxFileCount,
+			LogMaxFileSize:      logMaxFileSize,
+			EnableLogRotate:     enableLogRotate,
 		}
-		model.SaveConfig(configDirPath, "rebind", &config)
+		cSErr := model.SaveConfig(configDirPath, "rebind", &config)
+		if cSErr != nil {
+			logger.Errorf("Unable to save default config to file: ", cSErr)
+		}
 		os.Exit(0)
+	}
+	if useConfigFile {
+		logger.Info("Initialize Re-Bind from config file ...")
+		var config model.ReBindConfig
+		cLErr := model.LoadConfig(configDirPath, "rebind", &config)
+		if cLErr != nil {
+			logger.Errorf("Unable to load default config from file: ", cLErr)
+		} else {
+			rwDirPath = config.DataDirPath
+			configDirPath = config.ConfigDirPath
+			listenIP = config.ListenIP
+			listenPort = config.ListenPort
+			dnsPipeIP = config.DnsPipeIP
+			dnsPipePort = config.DnsPipePort
+			dnsPipeResponsePort = config.DnsPipeResponsePort
+			enableFileLogging = config.EnableFileLogging
+			logVerbosity = config.LogVerbosity
+			logFilePath = config.LogFilePath
+			logMaxFileCount = config.LogFileCount
+			logMaxFileSize = config.LogMaxFileSize
+			enableLogRotate = config.EnableLogRotate
+		}
+	}
+	verbosity := log.LogLevelFromString(logVerbosity)
+	if enableFileLogging {
+		if _, err := os.Stat(logFilePath); err != nil {
+			_ = os.MkdirAll(logFilePath, 0660)
+		}
+		logDir, _ := os.Open(logFilePath)
+		var logErr, logRErr error
+		var rotator log.LogRotator
+		if enableLogRotate {
+			rotator, logRErr = log.NewLogRotator(logDir, "rebind.log", logMaxFileSize, logMaxFileCount, nil)
+		} else {
+			rotator, logRErr = log.NewLogNoRotator(logDir, "rebind.log", nil)
+		}
+		if logRErr != nil {
+			logger.Errorf("Unable to instantiate log rotator: ", logRErr)
+		} else {
+			logger, logErr = log.NewFileLogger("re-bind",
+				rotator,
+				verbosity)
+			if logErr != nil {
+				logger.Errorf("Unable to instantiate file logger: ", logErr)
+			} else {
+				logger = log.NewLogger("re-bind", verbosity)
+			}
+		}
+	} else {
+		logger = log.NewLogger("re-bind", verbosity)
 	}
 	logger.Info("Starting Re-Bind DNS Server ...")
 	if err := os.MkdirAll(rwDirPath, 0666); err != nil {
@@ -104,5 +175,6 @@ func main() {
 	}
 	dnsServer := dns.Start(rwDirPath, listenIP, listenPort, dnsPipeIP, dnsPipePort, dnsPipeResponsePort, logger, []net.UDPAddr{{IP: net.ParseIP(listenIP), Port: listenPort}})
 	time.Sleep(5 * time.Second)
+	logger.Info("Re-Bind DNS Server started!!")
 	dnsServer.Wait()
 }

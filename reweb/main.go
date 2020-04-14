@@ -24,6 +24,12 @@ var rwDirPath string
 var configDirPath string
 var initializeAndExit bool
 var useConfigFile bool
+var enableFileLogging bool
+var logVerbosity string
+var logFilePath string
+var enableLogRotate bool
+var logMaxFileSize int64
+var logMaxFileCount int
 var listenIP string
 var listenPort int
 var dnsPipeIP string
@@ -43,6 +49,12 @@ func init() {
 	flag.StringVar(&configDirPath, "config-dir", rest.DefaultConfigFolder, "dns config dir")
 	flag.BoolVar(&initializeAndExit, "init-and-exit", false, "initialize config in the config dir and exit")
 	flag.BoolVar(&useConfigFile, "use-config-file", false, "use config file instead parameters")
+	flag.BoolVar(&enableFileLogging, "enable-file-log", false, "enable logginf over file")
+	flag.StringVar(&logVerbosity, "log-verbosity", rest.DefaultLogFileLevel, "log file verbosity level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL)")
+	flag.StringVar(&logFilePath, "log-file-path", rest.DefaultLogFileFolder, "log file path")
+	flag.BoolVar(&enableLogRotate, "log-rotate", true, "log file rotation enabled")
+	flag.Int64Var(&logMaxFileSize, "log-max-size", 1024, "log file rotation max file size in bytes")
+	flag.IntVar(&logMaxFileCount, "log-count", 1024, "log file rotation max number of file")
 	flag.StringVar(&listenIP, "listen-ip", rest.DefaultIpAddress, "http server ip")
 	flag.IntVar(&listenPort, "listen-port", rest.DefaultRestServerPort, "http server port")
 	flag.StringVar(&dnsPipeIP, "dns-pipe-ip", rest.DefaultDnsPipeAddress, "tcp dns pipe ip")
@@ -71,9 +83,70 @@ func main() {
 			DnsPipeResponsePort: dnsPipeResponsePort,
 			TlsCert:             tlsCert,
 			TlsKey:              tlsKey,
+			EnableFileLogging:   enableFileLogging,
+			LogVerbosity:        logVerbosity,
+			LogFilePath:         logFilePath,
+			LogFileCount:        logMaxFileCount,
+			LogMaxFileSize:      logMaxFileSize,
+			EnableLogRotate:     enableLogRotate,
 		}
-		model.SaveConfig(configDirPath, "reweb", &config)
+		cSErr := model.SaveConfig(configDirPath, "reweb", &config)
+		if cSErr != nil {
+			logger.Errorf("Unable to save default config to file: ", cSErr)
+		}
 		os.Exit(0)
+	}
+	if useConfigFile {
+		logger.Info("Initialize Re-Web from config file ...")
+		var config model.ReWebConfig
+		cLErr := model.LoadConfig(configDirPath, "reweb", &config)
+		if cLErr != nil {
+			logger.Errorf("Unable to load default config from file: ", cLErr)
+		} else {
+			rwDirPath = config.DataDirPath
+			configDirPath = config.ConfigDirPath
+			listenIP = config.ListenIP
+			listenPort = config.ListenPort
+			dnsPipeIP = config.DnsPipeIP
+			dnsPipePort = config.DnsPipePort
+			dnsPipeResponsePort = config.DnsPipeResponsePort
+			enableFileLogging = config.EnableFileLogging
+			logVerbosity = config.LogVerbosity
+			logFilePath = config.LogFilePath
+			logMaxFileCount = config.LogFileCount
+			logMaxFileSize = config.LogMaxFileSize
+			enableLogRotate = config.EnableLogRotate
+			tlsCert = config.TlsCert
+			tlsKey = config.TlsKey
+		}
+	}
+	verbosity := log.LogLevelFromString(logVerbosity)
+	if enableFileLogging {
+		if _, err := os.Stat(logFilePath); err != nil {
+			_ = os.MkdirAll(logFilePath, 0660)
+		}
+		logDir, _ := os.Open(logFilePath)
+		var logErr, logRErr error
+		var rotator log.LogRotator
+		if enableLogRotate {
+			rotator, logRErr = log.NewLogRotator(logDir, "reweb.log", logMaxFileSize, logMaxFileCount, nil)
+		} else {
+			rotator, logRErr = log.NewLogNoRotator(logDir, "reweb.log", nil)
+		}
+		if logRErr != nil {
+			logger.Errorf("Unable to instantiate log rotator: ", logRErr)
+		} else {
+			logger, logErr = log.NewFileLogger("re-web",
+				rotator,
+				verbosity)
+			if logErr != nil {
+				logger.Errorf("Unable to instantiate file logger: ", logErr)
+			} else {
+				logger = log.NewLogger("re-web", verbosity)
+			}
+		}
+	} else {
+		logger = log.NewLogger("re-web", verbosity)
 	}
 	logger.Info("Starting Re-Web Rest Server ...")
 	if err := os.MkdirAll(rwDirPath, 0666); err != nil {
@@ -140,5 +213,7 @@ func main() {
 	}
 	if err != nil {
 		logger.Fatalf("RestService start-up:: Error listening on s:%v - Error: %v\n", listenIP, listenPort, err)
+		os.Exit(1)
 	}
+	logger.Info("Re-Web DNS Server started!!")
 }

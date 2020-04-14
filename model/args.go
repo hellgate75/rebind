@@ -35,6 +35,12 @@ type ReWebConfig struct {
 	DnsPipeResponsePort int    `yaml:"dnsPipeResponsePort" json:"dnsPipeResponsePort" xml:"dns-pipe-response-port"`
 	TlsCert             string `yaml:"tlsCertFilePath" json:"tlsCertFilePath" xml:"tls-cert-file-path"`
 	TlsKey              string `yaml:"tlsKeyFilePath" json:"tlsKeyFilePath" xml:"tls-key-file-path"`
+	EnableFileLogging   bool   `yaml:"enableFileLogging" json:"enableFileLogging" xml:"enable-file-logging"`
+	LogVerbosity        string `yaml:"logVerbosity" json:"logVerbosity" xml:"log-verbosity"`
+	LogFilePath         string `yaml:"logFilePath" json:"logFilePath" xml:"log-file-path"`
+	EnableLogRotate     bool   `yaml:"enableLogRotate" json:"enableLogRotate" xml:"enable-log-rotate"`
+	LogMaxFileSize      int64  `yaml:"logMaxFileSize" json:"logMaxFileSize" xml:"log-max-file-size"`
+	LogFileCount        int    `yaml:"logFileCount" json:"logFileCount" xml:"log-file-count"`
 }
 
 type ReBindConfig struct {
@@ -45,6 +51,12 @@ type ReBindConfig struct {
 	DnsPipeIP           string `yaml:"dnsPipeIp" json:"dnsPipeIp" xml:"dns-pipe-ip"`
 	DnsPipePort         int    `yaml:"dnsPipePort" json:"dnsPipePort" xml:"dns-pipe-port"`
 	DnsPipeResponsePort int    `yaml:"dnsPipeResponsePort" json:"dnsPipeResponsePort" xml:"dns-pipe-response-port"`
+	EnableFileLogging   bool   `yaml:"enableFileLogging" json:"enableFileLogging" xml:"enable-file-logging"`
+	LogVerbosity        string `yaml:"logVerbosity" json:"logVerbosity" xml:"log-verbosity"`
+	LogFilePath         string `yaml:"logFilePath" json:"logFilePath" xml:"log-file-path"`
+	EnableLogRotate     bool   `yaml:"enableLogRotate" json:"enableLogRotate" xml:"enable-log-rotate"`
+	LogMaxFileSize      int64  `yaml:"logMaxFileSize" json:"logMaxFileSize" xml:"log-max-file-size"`
+	LogFileCount        int    `yaml:"logFileCount" json:"logFileCount" xml:"log-file-count"`
 }
 
 func SaveConfig(path string, name string, config interface{}) error {

@@ -1,10 +1,9 @@
 FROM ubuntu:bionic
 
-ENV GROUP_NAME="aangine"\
- FORWARDERS="8.8.8.8;8.8.4.4"\
- DEBIAN_FRONTEND=noninteractive\
- USE_CONFIG_FROM_VOLUME=no\
- REBUILD_CONFIG=once
+ENV GOINST=/usr/share/go\
+	GOPATH=/root/go
+ENV PATH=${PATH}:${GOPATH}/bin:${GOINST}/bin\
+ DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
   && apt-get install -y apt-utils \
@@ -25,8 +24,6 @@ RUN apt-get update \
 # Copy configuration files
 COPY config/rebind.yaml /etc/rebind
 COPY config/reweb.yaml /etc/rebind
-COPY logrotate/rebind /etc/logrotate.d
-COPY logrotate/reweb /etc/logrotate.d
 COPY defaults/rebind /etc/defaults
 COPY defaults/web /etc/defaults
 COPY init.d/rebind /etc/init.d
@@ -38,12 +35,14 @@ COPY docker-entrypoint.sh /
 
 # Enable Re-Bin and Re-Web
 RUN dos2unix /root/install-golang.sh &&\
- chmod +x /root/install-golang.sh &&
- /root/install-golang.sh &&
+ chmod +x /root/install-golang.sh &&\
+ sh -c /root/install-golang.sh &&\
  go get -u github.com/rebind/rebind &&\
  go get -u github.com/rebind/reweb &&\
+ chmod +x /root/go/bin/* &&\
+ mv /root/go/bin/reweb /usr/sbin/ &&\
+ mv /root/go/bin/reweb /usr/sbin/ &&\
  dos2unix /docker-entrypoint.sh &&\
- dos2unix /etc/logrotate.d/* &&\
  dos2unix /etc/rebind/* &&\
  dos2unix /etc/init.d/* &&\
  mkdir /var/log/bind &&\
@@ -54,10 +53,14 @@ RUN dos2unix /root/install-golang.sh &&\
  update-rc.d reweb enable &&\
  chmod +x /docker-entrypoint.sh
 
+# Exposed volums : /etc/rebind: Configuration volume, /var/rebind: Data volume
+
 VOLUME ["/etc/rebind", "/var/rebind"]
+
+# Exposed ports : REST Service: 9000, Dns Service: 53
 
 EXPOSE 9000/tcp 53/udp
 
-#Entry point
+# Entry point
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

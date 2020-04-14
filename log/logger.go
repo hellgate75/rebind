@@ -35,6 +35,35 @@ const (
 	FATAL LogLevel = LogLevel("FATAL")
 )
 
+func strRightPad(val string, padding int) string {
+	if len(val) < padding {
+		val = val + strings.Repeat(" ", padding-len(val))
+	} else if len(val) > padding {
+		val = val[:(padding-3)] + "..."
+	}
+	return val
+}
+
+func (l LogLevel) String() string {
+	return strRightPad(string(l), 5)
+}
+func LogLevelFromString(level string) LogLevel {
+	switch strings.ToUpper(level) {
+	case strings.TrimSpace(TRACE.String()):
+		return TRACE
+	case strings.TrimSpace(DEBUG.String()):
+		return DEBUG
+	case strings.TrimSpace(WARN.String()):
+		return WARN
+	case strings.TrimSpace(ERROR.String()):
+		return ERROR
+	case strings.TrimSpace(FATAL.String()):
+		return FATAL
+	default:
+		return INFO
+	}
+}
+
 type Logger interface {
 	Tracef(format string, in ...interface{})
 	Trace(in ...interface{})
@@ -66,23 +95,22 @@ type Logger interface {
 }
 
 type logger struct {
-	sync.Mutex // ensures atomic writes; protects the following fields
-	verbosity       LogLevelValue
-	onScreen        bool
-	prefix          string     // prefix on each line to identify the logger (but see Lmsgprefix)
-	flag            int        // properties
-	out             io.Writer  // destination for output
-	buf             []byte     // for accumulating text to write
-	mainLogger	    *logger	// Main logger, for affiliated Sub-Loggers
-	logRotator 		LogRotator //Log Rotator in case of file writer
-	echoWriters		map[string]io.Writer //MAp of Writers to echo the logs to
+	sync.Mutex  // ensures atomic writes; protects the following fields
+	verbosity   LogLevelValue
+	onScreen    bool
+	prefix      string               // prefix on each line to identify the logger (but see Lmsgprefix)
+	flag        int                  // properties
+	out         io.Writer            // destination for output
+	buf         []byte               // for accumulating text to write
+	mainLogger  *logger              // Main logger, for affiliated Sub-Loggers
+	logRotator  LogRotator           //Log Rotator in case of file writer
+	echoWriters map[string]io.Writer //MAp of Writers to echo the logs to
 
 }
 
 func (l *logger) IsAffiliated() bool {
 	return l.mainLogger != nil
 }
-
 
 func (lg *logger) AffiliateTo(l Logger) {
 	lg.mainLogger = l.(*logger)
@@ -96,7 +124,7 @@ func (l *logger) AffiliateLogf(affiliateAppName string, level LogLevelValue, for
 }
 
 func (l *logger) AffiliateWrite(affiliateAppName string, buff []byte) {
-	var buffer *bytes.Buffer = bytes.NewBuffer([]byte("[" + affiliateAppName +  "] "))
+	var buffer *bytes.Buffer = bytes.NewBuffer([]byte("[" + affiliateAppName + "] "))
 	buffer.Write(buff)
 	l.write(buffer.Bytes())
 
@@ -364,7 +392,7 @@ func (l *logger) formatHeader(prefix string, buf *[]byte, t time.Time, file stri
 }
 
 func (l *logger) AddEchoWriter(key string, writer io.Writer) {
-	defer func(){
+	defer func() {
 		_ = recover()
 		l.Unlock()
 	}()
@@ -374,7 +402,7 @@ func (l *logger) AddEchoWriter(key string, writer io.Writer) {
 	}
 }
 func (l *logger) RemoveEchoWriter(echoKey string) {
-	defer func(){
+	defer func() {
 		_ = recover()
 		l.Unlock()
 	}()
@@ -400,7 +428,6 @@ func (l *logger) reloadWriter() {
 	}
 }
 
-
 func (l *logger) echo() {
 	for _, w := range l.echoWriters {
 		if w != nil {
@@ -413,11 +440,11 @@ func (l *logger) output(color color.Color, calldepth int, s string) error {
 	return l.outputLogger(l.prefix, color, calldepth, s)
 }
 func (l *logger) outputLogger(prefix string, color color.Color, calldepth int, s string) error {
-	defer func(){
+	defer func() {
 		if r := recover(); r == nil {
 			l.echo()
 		}
-		if l.logRotator != nil {
+		if l.logRotator != nil && l.logRotator.IsEnabled() {
 			l.logRotator.Hook(int64(len(l.buf)))
 		}
 		l.Unlock()
@@ -454,14 +481,14 @@ func (l *logger) outputLogger(prefix string, color color.Color, calldepth int, s
 
 func NewLogger(appName string, verbosity LogLevel) Logger {
 	return &logger{
-		verbosity: toVerbosityLevelValue(verbosity),
-		onScreen:  true,
-		out:       os.Stdout,
-		prefix:    "[" + appName + "] ",
-		flag:      LstdFlags | LUTC,
-		mainLogger: nil,
-		buf: []byte{},
-		logRotator: nil, // Just to highlight the rotator state
+		verbosity:   toVerbosityLevelValue(verbosity),
+		onScreen:    true,
+		out:         os.Stdout,
+		prefix:      "[" + appName + "] ",
+		flag:        LstdFlags | LUTC,
+		mainLogger:  nil,
+		buf:         []byte{},
+		logRotator:  nil, // Just to highlight the rotator state
 		echoWriters: make(map[string]io.Writer),
 	}
 }
@@ -475,14 +502,14 @@ func NewFileLogger(appName string, logRotator LogRotator, verbosity LogLevel) (L
 		return nil, errors.New("log.Logger: Unable to receive rotator write stream")
 	}
 	logger := &logger{
-		verbosity: toVerbosityLevelValue(verbosity),
-		onScreen:  false,
-		out:       out,
-		prefix:    "[" + appName + "] ",
-		flag:      LstdFlags | LUTC,
-		mainLogger: nil,
-		buf: []byte{},
-		logRotator: logRotator,
+		verbosity:   toVerbosityLevelValue(verbosity),
+		onScreen:    false,
+		out:         out,
+		prefix:      "[" + appName + "] ",
+		flag:        LstdFlags | LUTC,
+		mainLogger:  nil,
+		buf:         []byte{},
+		logRotator:  logRotator,
 		echoWriters: make(map[string]io.Writer),
 	}
 	logger.logRotator.UpdateCallBack(logger.reloadWriter)

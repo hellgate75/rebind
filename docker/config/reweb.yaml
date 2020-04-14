@@ -1,0 +1,15 @@
+dataDir: /var/rebind
+configDir: /etc/rebind
+listenIp: 0.0.0.0
+listenPort: 9000
+dnsPipeIp: 127.0.0.1
+dnsPipePort: 954
+dnsPipeResponsePort: 953
+tlsCertFilePath: ""
+tlsKeyFilePath: ""
+enableFileLogging: true
+logVerbosity: INFO
+logFilePath: /var/log/rebind
+enableLogRotate: true
+logMaxFileSize: 1024
+logFileCount: 1024
