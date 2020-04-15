@@ -50,7 +50,7 @@ case "$1" in
 	# dirs under /run can go away on reboots.
 	mkdir -p /run/rebind
 	chmod 775 /run/rebind
-	chown root:rebind /run/rebind >/dev/null 2>&1 || true
+	chown $USERNAME:$USERGROUP /run/rebind >/dev/null 2>&1 || true
 
 	if [ ! -x /usr/sbin/rebind ]; then
 	    log_action_msg "rebind binary missing - not starting"
@@ -65,8 +65,8 @@ case "$1" in
     if [ "X$INITCONFIG" != "Xno" ] && [ ! -e /etc/rebind/rebind.yaml ] ; then
        su - $USERNAME && /usr/sbin/rebind -init-and-exit true
     fi
-	if start-stop-daemon --start --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/rebind \
-		--pidfile ${PIDFILE} -- $OPTIONS; then
+	if start-stop-daemon --start --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/start-rebind.sh \
+		 -- $OPTIONS; then
 	    log_end_msg 0
 	else
 	    log_end_msg 1
@@ -83,7 +83,7 @@ case "$1" in
 	pid=$(/usr/sbin/rndc stop -p | awk '/^pid:/ {print $2}') || true
 	if [ -z "$pid" ]; then		# no pid found, so either not running, or error
 	    pid=$(pgrep -f ^/usr/sbin/rebind) || true
-	    start-stop-daemon --stop --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/rebind \
+	    start-stop-daemon --stop --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/stop-rebind.sh \
 		    --pidfile ${PIDFILE} -- $OPTIONS
 	fi
 	if [ -n "$pid" ]; then
