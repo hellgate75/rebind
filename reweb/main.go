@@ -39,7 +39,7 @@ var tlsCert string
 var tlsKey string
 
 //TODO: Give Life to Logger
-var logger log.Logger = log.NewLogger("re-web", log.INFO)
+var logger log.Logger = log.NewLogger("re-web", log.DEBUG)
 
 var defaultForwarders = make([]net.UDPAddr, 0)
 
@@ -103,6 +103,8 @@ func main() {
 		if cLErr != nil {
 			logger.Errorf("Unable to load default config from file: ", cLErr)
 		} else {
+			logger.Warnf("Loading configuration from file complete!!", config)
+			logger.Debugf("Configuration: %v", config)
 			rwDirPath = config.DataDirPath
 			configDirPath = config.ConfigDirPath
 			listenIP = config.ListenIP

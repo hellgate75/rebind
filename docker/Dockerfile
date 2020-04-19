@@ -1,7 +1,8 @@
 FROM ubuntu:bionic
 
 ENV GOINST=/usr/share/go\
-	GOPATH=/root/go
+	GOPATH=/root/go\
+	GOVER=1.14
 ENV PATH=${PATH}:/root/go/bin:/usr/share/go/bin\
  DEBIAN_FRONTEND=noninteractive
 

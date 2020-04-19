@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-export GOVER="$(wget -q -O - https://golang.org/doc/devel/release.html | grep "<h2 id=\"go" | awk 'BEGIN {FS=OFS=" "}{print $2}' | awk 'BEGIN {FS=OFS="\""}{print $2}'|head -1|awk 'BEGIN {FS=OFS="go"}{print $2}')"
+if [[ "" = "$GOVER" ]]; then
+    export GOVER="$(wget -q -O - https://golang.org/doc/devel/release.html | grep "<h2 id=\"go" | awk 'BEGIN {FS=OFS=" "}{print $2}' | awk 'BEGIN {FS=OFS="\""}{print $2}'|head -1|awk 'BEGIN {FS=OFS="go"}{print $2}')"
+    echo "Latest detected Go Language version is $GOVER"
+else
+    echo "Using provided Go Language version: $GOVER"
+fi
 export ARCH=amd64
 export OS=linux
 GIT_USER=hellgate75
 GIT_EMAIL=hellgate75@gmail.com
-echo "Latest detected Go Language version is $GOVER"
 rm -f /root/install-golang-prereq.sh
 wget -Lq https://dl.google.com/go/go${GOVER}.${OS}-${ARCH}.tar.gz -O /root/go${GOVER}.${OS}-${ARCH}.tar.gz
 tar -xzf /root/go${GOVER}.${OS}-${ARCH}.tar.gz -C /usr/share/

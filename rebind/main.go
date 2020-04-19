@@ -96,6 +96,8 @@ func main() {
 		if cLErr != nil {
 			logger.Errorf("Unable to load default config from file: ", cLErr)
 		} else {
+			logger.Warnf("Loading configuration from file complete!!", config)
+			logger.Debugf("Configuration: %v", config)
 			rwDirPath = config.DataDirPath
 			configDirPath = config.ConfigDirPath
 			listenIP = config.ListenIP
