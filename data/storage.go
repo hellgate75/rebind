@@ -395,10 +395,10 @@ func (i *GroupsBucket) ListGroups() []Group {
 func (i *GroupsBucket) SaveGroup(groupStore store.GroupStoreData, group Group) (Group, error) {
 	var err error
 	//if group == nil {
-	//	return nil, errors.New("Unable to save nil group ...")
+	//	return nil, rerrors.New("Unable to save nil group ...")
 	//}
 	//if groupStore == nil {
-	//	return nil, errors.New("Unable to save nil group store ...")
+	//	return nil, rerrors.New("Unable to save nil group store ...")
 	//}
 	defer func() {
 		if r := recover(); r != nil {

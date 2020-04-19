@@ -7,10 +7,9 @@ package log
 import (
 	errs "errors"
 	"fmt"
-	"github.com/hellgate75/rebind/errors"
+	"github.com/hellgate75/rebind/rerrors"
 	"github.com/hellgate75/rebind/utils"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -23,14 +22,14 @@ const (
 )
 
 var (
-	sepString = fmt.Sprintf("%s", os.PathSeparator)
+	sepString = fmt.Sprintf("%c", os.PathSeparator)
 )
 
 type RotationCallBack func()
 
 type LogRotator interface {
 	IsEnabled() bool
-	Hook(msgLen int64) errors.Error
+	Hook(msgLen int64) rerrors.Error
 	GetDefaultWriter() (io.Writer, bool)
 	UpdateCallBack(callback RotationCallBack)
 }
@@ -65,14 +64,14 @@ func (r *_rotator) GetDefaultWriter() (io.Writer, bool) {
 	return nil, false
 }
 
-func (r *_rotator) Hook(msgLen int64) errors.Error {
-	var internalError errors.Error
+func (r *_rotator) Hook(msgLen int64) rerrors.Error {
+	var internalError rerrors.Error
 	if r.rotateLen <= 0 || r.maxSize <= 0 {
 		return internalError
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			internalError = errors.New(errs.New(""), 44, errors.GenericErrorType)
+			internalError = rerrors.New(errs.New(""), 44, rerrors.GenericErrorType)
 		}
 		r.Unlock()
 	}()
@@ -116,10 +115,10 @@ func (r *_rotator) refreshWriter() {
 		r.folder, _ = os.Open(info.Name())
 	}
 	fileName := fmt.Sprintf("%s%s%s", r.folder.Name(), sepString, r.fileName)
-	if _, err := r.folder.Stat(); err != nil {
-		ioutil.WriteFile(fileName, []byte{}, 0660)
+	if _, err := r.folder.Stat(); err == nil {
+		_ = os.Remove(fileName)
 	}
-	r.writer, _ = os.Open(fileName)
+	r.writer, _ = os.Create(fileName)
 	r.updateFromFolder()
 }
 
@@ -214,11 +213,12 @@ func (r *_rotator) rotateLogs() {
 
 func (r *_rotator) checkRotate() {
 	if r.currentFile.Size >= r.maxSize {
-		r.rotateLogs()
+		//r.rotateLogs()
 	}
 }
 
 func (r *_rotator) updateFromFolder() {
+	return
 	var files []*utils.FileIndex = make([]*utils.FileIndex, 0)
 	fileList := r.readFiles()
 	if len(fileList) == 0 {
@@ -241,7 +241,7 @@ func (r *_rotator) updateFromFolder() {
 }
 
 func (r *_rotator) readFiles() []string {
-	var list []string = make([]string, 0)
+	var list = make([]string, 0)
 	folderName := r.folder.Name()
 	finfoArr, err := r.folder.Readdir(0)
 	if err != nil {

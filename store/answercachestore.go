@@ -7,8 +7,8 @@ package store
 import (
 	"errors"
 	"fmt"
-	rErrrors "github.com/hellgate75/rebind/errors"
 	"github.com/hellgate75/rebind/model"
+	rErrrors "github.com/hellgate75/rebind/rerrors"
 	"github.com/hellgate75/rebind/utils"
 	"golang.org/x/net/dns/dnsmessage"
 	"sync"

@@ -7,7 +7,7 @@ package store
 import (
 	"errors"
 	"fmt"
-	rErrrors "github.com/hellgate75/rebind/errors"
+	rErrrors "github.com/hellgate75/rebind/rerrors"
 	"github.com/hellgate75/rebind/utils"
 	"sync"
 	"time"

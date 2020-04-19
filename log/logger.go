@@ -420,10 +420,11 @@ func (l *logger) RemoveEchoWriter(echoKey string) {
 
 func (l *logger) reloadWriter() {
 	var out io.Writer
+	var state bool
 	if l.logRotator != nil {
-		out, _ = l.logRotator.GetDefaultWriter()
+		out, state = l.logRotator.GetDefaultWriter()
 	}
-	if out != nil {
+	if state && out != nil {
 		l.out = out
 	}
 }
@@ -449,20 +450,18 @@ func (l *logger) outputLogger(prefix string, color color.Color, calldepth int, s
 		}
 		l.Unlock()
 	}()
+	l.Lock()
 	now := time.Now() // get this early.
 	var file string
 	var line int
-	l.Lock()
 	if l.flag&(Lshortfile|Llongfile) != 0 {
 		// Release lock while getting caller info - it's expensive.
-		l.Unlock()
 		var ok bool
 		_, file, line, ok = runtime.Caller(calldepth)
 		if !ok {
 			file = "???"
 			line = 0
 		}
-		l.Lock()
 	}
 	l.buf = l.buf[:0]
 	l.formatHeader(prefix, &l.buf, now, file, line)

@@ -135,16 +135,17 @@ func main() {
 		if logRErr != nil {
 			logger.Errorf("Unable to instantiate log rotator: ", logRErr)
 		} else {
-			logger.Warn("Staring file logging ...")
+			logger.Warn("Starting file logging ...")
 			logger, logErr = log.NewFileLogger("re-bind",
 				rotator,
 				verbosity)
+			logger.Warn("Log initialization ...")
 			if logErr != nil {
 				logger.Warn("No File logging started for error...")
 				logger = log.NewLogger("re-bind", verbosity)
 				logger.Errorf("Unable to instantiate file logger: ", logErr)
 			} else {
-				logger.Warn("File logging started ...")
+				logger.Warn("File logging started!!")
 			}
 		}
 	} else {
