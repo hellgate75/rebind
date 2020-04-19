@@ -14,8 +14,8 @@ COPY config/passwd /etc
 COPY config/group /etc
 COPY config/rebind.yaml /etc/rebind
 COPY config/reweb.yaml /etc/rebind
-COPY defaults/rebind /etc/defaults
-COPY defaults/reweb /etc/defaults
+COPY defaults/rebind /etc/default
+COPY defaults/reweb /etc/default
 COPY init.d/rebind /etc/init.d
 COPY init.d/reweb /etc/init.d
 
@@ -42,6 +42,8 @@ RUN chmod 644 /etc/passwd /etc/group &&\
  dos2unix /bin/install-pkgs &&\
  dos2unix /usr/sbin/start-* &&\
  dos2unix /usr/sbin/stop-* &&\
+ dos2unix /etc/default/* &&\
+ chmod +x /etc/default/* &&\
  chmod +x /bin/install-pkgs &&\
  chmod +x /usr/sbin/start-* &&\
  chmod +x /usr/sbin/stop-* &&\

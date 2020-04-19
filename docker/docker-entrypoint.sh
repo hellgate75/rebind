@@ -19,8 +19,8 @@ chown -R rebind:rebind /var/rebind
 chown -R rebind:rebind /etc/rebind
 chmod -Rf 0660 /var/rebind
 chown -Rf 0660 /etc/rebind
-service rebind start
-service reweb start
+service rebind restart
+service reweb restart
 if [ $# -gt 0 ]; then
 	echo "Re-Bind: Running command: $@"
 	sh -c "$@"

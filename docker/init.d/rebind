@@ -80,12 +80,9 @@ case "$1" in
 	    log_end_msg 1
 	fi
 
-	pid=$(/usr/sbin/rndc stop -p | awk '/^pid:/ {print $2}') || true
-	if [ -z "$pid" ]; then		# no pid found, so either not running, or error
-	    pid=$(pgrep -f ^/usr/sbin/rebind) || true
-	    start-stop-daemon --stop --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/stop-rebind.sh \
-		    --pidfile ${PIDFILE} -- $OPTIONS
-	fi
+    pid=$(pgrep -f ^/usr/sbin/rebind) || true
+    start-stop-daemon --stop --oknodo --quiet -u $USERNAME -g $USERGROUP --exec /usr/sbin/stop-rebind.sh \
+        --pidfile ${PIDFILE} -- $OPTIONS
 	if [ -n "$pid" ]; then
 	    sig=0
 	    n=1
@@ -108,16 +105,6 @@ case "$1" in
 	log_end_msg 0
     ;;
 
-    reload|force-reload)
-	log_daemon_msg "Reloading Re-Bind domain name service..." "rebind"
-	if ! check_network; then
-	    log_action_msg "no networks configured"
-	    log_end_msg 1
-	fi
-
-	/usr/sbin/rndc reload >/dev/null && log_end_msg 0 || log_end_msg 1
-    ;;
-
     restart)
 	if ! check_network; then
 	    log_action_msg "no networks configured"
@@ -135,7 +122,7 @@ case "$1" in
 	;;
 
     *)
-	log_action_msg "Usage: /etc/init.d/rebind {start|stop|reload|restart|force-reload|status}"
+	log_action_msg "Usage: /etc/init.d/rebind {start|stop|restart|force-reload|status}"
 	exit 1
     ;;
 esac

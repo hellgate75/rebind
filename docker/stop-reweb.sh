@@ -21,6 +21,13 @@ if [ -e /run/rebind/reweb.pid ]; then
             sleep 1
             done
     fi
+    pid = "$(ps -eaf|grep reweb|head -1|awk 'BEGIN {FS=OFS=" "}{print $2}')"
+    while [ "" != "$pid" ]; do
+        kill -9 $pid
+        pid = "$(ps -eaf|grep reweb|head -1|awk 'BEGIN {FS=OFS=" "}{print $2}')"
+        sleep 5
+    done
+    rm -f /run/rebind/reweb.pid
 else
     echo "PID file doesn't exist. Service is stopped!!"
 fi

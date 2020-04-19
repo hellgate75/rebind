@@ -30,7 +30,7 @@ func (s *DnsRootService) Create(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: "Not allowed on dns root",
-		Data:    DnsRootResponse{Groups: []string{}},
+		Data:    nil,
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *DnsRootService) Update(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: "Not allowed on dns root",
-		Data:    DnsRootResponse{Groups: []string{}},
+		Data:    nil,
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *DnsRootService) Delete(w http.ResponseWriter, r *http.Request) {
 	response := model.Response{
 		Status:  http.StatusMethodNotAllowed,
 		Message: "Not allowed on dns root",
-		Data:    DnsRootResponse{Groups: []string{}},
+		Data:    nil,
 	}
 	err := utils.RestParseResponse(w, r, &response)
 	if err != nil {

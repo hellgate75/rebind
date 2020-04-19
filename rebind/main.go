@@ -113,30 +113,38 @@ func main() {
 	}
 	verbosity := log.LogLevelFromString(logVerbosity)
 	if enableFileLogging {
+		logger.Warnf("Enabling file logging at path: %s", logFilePath)
 		if _, err := os.Stat(logFilePath); err != nil {
 			_ = os.MkdirAll(logFilePath, 0660)
 		}
 		logDir, _ := os.Open(logFilePath)
+		logger.Warnf("File logging at path: %s enabled...", logFilePath)
 		var logErr, logRErr error
 		var rotator log.LogRotator
 		if enableLogRotate {
+			logger.Warn("Enable log rotating ...")
 			rotator, logRErr = log.NewLogRotator(logDir, "rebind.log", logMaxFileSize, logMaxFileCount, nil)
 		} else {
+			logger.Warn("No log rotating is enabled...")
 			rotator, logRErr = log.NewLogNoRotator(logDir, "rebind.log", nil)
 		}
 		if logRErr != nil {
 			logger.Errorf("Unable to instantiate log rotator: ", logRErr)
 		} else {
+			logger.Warn("Staring file logging ...")
 			logger, logErr = log.NewFileLogger("re-bind",
 				rotator,
 				verbosity)
 			if logErr != nil {
+				logger.Warn("No File logging started for error...")
+				logger = log.NewLogger("re-bind", verbosity)
 				logger.Errorf("Unable to instantiate file logger: ", logErr)
 			} else {
-				logger = log.NewLogger("re-bind", verbosity)
+				logger.Warn("File logging started ...")
 			}
 		}
 	} else {
+		logger.Warn("No File logging selected ...")
 		logger = log.NewLogger("re-bind", verbosity)
 	}
 	logger.Info("Starting Re-Bind DNS Server ...")

@@ -11,5 +11,5 @@ enableFileLogging: true
 logVerbosity: DEBUG
 logFilePath: /var/log/rebind
 enableLogRotate: true
-logMaxFileSize: 1024
-logFileCount: 1024
+logMaxFileSize: 10240
+logFileCount: 5
