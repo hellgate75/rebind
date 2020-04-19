@@ -97,7 +97,8 @@ func main() {
 		os.Exit(0)
 	}
 	if useConfigFile {
-		logger.Info("Initialize Re-Web from config file ...")
+		logger.Warn("Initialize Re-Web from config file ...")
+		logger.Warnf("Re-Web config folder: %s", configDirPath)
 		var config model.ReWebConfig
 		cLErr := model.LoadConfig(configDirPath, "reweb", &config)
 		if cLErr != nil {
@@ -123,6 +124,7 @@ func main() {
 		}
 	}
 	verbosity := log.LogLevelFromString(logVerbosity)
+	logger.Warnf("File logging enabled: %v", enableFileLogging)
 	if enableFileLogging {
 		logger.Warnf("Enabling file logging at path: %s", logFilePath)
 		if _, err := os.Stat(logFilePath); err != nil {

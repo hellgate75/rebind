@@ -43,7 +43,7 @@ check_network() {
 
 case "$1" in
     start)
-	log_daemon_msg "Starting Re-Web domain name service..." "reweb"
+	log_daemon_msg "Starting Re-Web Rest service..." "reweb"
 
 	modprobe capability >/dev/null 2>&1 || true
 
@@ -74,7 +74,7 @@ case "$1" in
     ;;
 
     stop)
-	log_daemon_msg "Stopping Re-Web domain name service..." "reweb"
+	log_daemon_msg "Stopping Re-Web Rest service..." "reweb"
 	if ! check_network; then
 	    log_action_msg "no networks configured"
 	    log_end_msg 1

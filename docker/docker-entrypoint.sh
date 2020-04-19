@@ -19,8 +19,13 @@ chown -R rebind:rebind /var/rebind
 chown -R rebind:rebind /etc/rebind
 chmod -Rf 0660 /var/rebind
 chown -Rf 0660 /etc/rebind
+echo "Updating Re-Web and Re-Bind services ..."
+go get -u github.com/hellgate75/rebind/rebind
+go get -u github.com/hellgate75/rebind/reweb
+echo "Starting Re-Web and Re-Bind services ..."
 service rebind restart
 service reweb restart
+echo "Re-Web and Re-Bind services start complete!!"
 if [ $# -gt 0 ]; then
 	echo "Re-Bind: Running command: $@"
 	sh -c "$@"
